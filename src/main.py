@@ -12,6 +12,7 @@ from api.weather.ecWeather import ecWxWorker
 from api.weather.owmWeather import owmWxWorker
 from api.weather.ecAlerts import ecWxAlerts
 from api.weather.nwsAlerts import nwsWxAlerts
+from api.weather.envSensor import envSensor
 from renderer.matrix import Matrix
 from update_checker import UpdateChecker
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -61,6 +62,13 @@ def run():
         pushbuttonThread.start()
     
     if data.config.weather_enabled:
+        # Run local enviromental sensor, requires a BME280
+        if data.config.env_sensor:
+            envSensorCollector = envSensor(data,sleepEvent)
+            envSensorThread = threading.Thread(target=envSensorCollector.run,args=())
+            envSensorThread.daemon = True
+            envSensorThread.start()
+
         if data.config.weather_data_feed.lower() == "owm":
             owmweather = owmWxWorker(data,sleepEvent)
             owmweatherThread = threading.Thread(target=owmweather.run,args=())
@@ -93,7 +101,7 @@ def run():
     #
     # Run check for updates against github on a background thread on a scheduler
     #     
-    updateCheck= True
+    updateCheck = True
     if updateCheck:
         scheduler = BackgroundScheduler()
         checkupdate = UpdateChecker(data,scheduler)

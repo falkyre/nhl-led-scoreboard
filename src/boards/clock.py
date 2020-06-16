@@ -67,9 +67,13 @@ class Clock:
 
         # Display curr temp and humidity on clock, bottom
         if self.data.config.weather_show_on_clock and self.wx_clock:
+            if self.data.config.env_sensor:
+                weatherstr = "IN: {} {}".format(self.data.wx_current_sensor[1],self.data.wx_current_sensor[2])
+            else:
+                weatherstr = self.data.wx_current[3] + " " +self.data.wx_current[5]
             self.matrix.draw_text_layout(
             self.layout.wx_display, 
-            self.data.wx_current[3] + " " +self.data.wx_current[5]
+            weatherstr
             ) 
             if len(self.data.wx_alerts) > 0:
                 # Draw Alert box (warning,watch,advisory)

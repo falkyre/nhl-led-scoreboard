@@ -65,6 +65,8 @@ class Data:
         self.wx_current = []
         self.wx_curr_wind = []
         self.wx_curr_precip = []
+        # Used if bme280 sensor connected
+        self.wx_current_sensor = []
         # Weather Alert Info
         self.wx_alerts = []
         self.wx_alert_interrupt = False 

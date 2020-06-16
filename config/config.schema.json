@@ -664,7 +664,8 @@
                         "update_freq": 5,
                         "duration": 30,
                         "show_alerts": true,
-                        "show_on_clock": true
+                        "show_on_clock": true,
+                        "env_sensor": true
                     }
                 ],
                 "additionalProperties": true,
@@ -680,7 +681,8 @@
                     "alert_title",
                     "scroll_alert",
                     "alert_duration",
-                    "show_on_clock"
+                    "show_on_clock",
+                    "env_sensor"
                 ],
                 "properties": {
                     "enabled": {
@@ -798,6 +800,16 @@
                         "type": "boolean",
                         "title": "show_on_clock",
                         "description": "Add the last observed temperature and humidity to the bottom of the clock board",
+                        "default": false,
+                        "examples": [
+                            true
+                        ]
+                    },
+                    "env_sensor": {
+                        "$id": "#/properties/weather/properties/env_sensor",
+                        "type": "boolean",
+                        "title": "env_sensor",
+                        "description": "Get local conditions (temp, pressure, humidity) from a bme280 sensor if attached",
                         "default": false,
                         "examples": [
                             true

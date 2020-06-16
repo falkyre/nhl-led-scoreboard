@@ -73,6 +73,7 @@ class ScoreboardConfig:
         self.weather_alert_duration = json["boards"]["weather"]["alert_duration"]
         # Show curr temp, humidity and any alerts on clock
         self.weather_show_on_clock = json["boards"]["weather"]["show_on_clock"]
+        self.env_sensor = json["boards"]["weather"]["env_sensor"]
 
 
         # States

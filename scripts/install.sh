@@ -40,7 +40,7 @@ sudo pip3 install geocoder python_tsl2591 ephem
 sudo pip3 uninstall numpy
 sudo apt-get install python3-numpy
 sudo apt-get install libatlas3-base
-sudo pip3 install env_canada pyowm noaa_sdk fastjsonschema
+sudo pip3 install env_canada pyowm noaa_sdk fastjsonschema geopy ratelimit
 sudo apt-get install libatlas-base-dev
 
 # For update checker
