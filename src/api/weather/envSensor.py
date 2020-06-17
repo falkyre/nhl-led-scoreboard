@@ -13,7 +13,8 @@ class envSensor(object):
         self.sleepEvent = sleepEvent
         self.weather_frequency = data.config.weather_update_freq
         self.time_format = data.config.time_format
-        self.altitude = 232
+        self.altitude = 292 #altitude in office
+        self.tempadj = 2.5 #adjustment for bme280 self heating
         self.port = 1
         self.address = 0x76
         self.bus = smbus2.SMBus(self.port)
@@ -50,7 +51,7 @@ class envSensor(object):
 
     def db_persist(self, data,pressure_sea):
         fields = [str(data.id), time.mktime(data.timestamp.timetuple()),
-                  data.temperature, data.pressure, data.humidity]
+                  data.temperature - self.tempadj, data.pressure, data.humidity]
 
         with sqlite3.connect(self.dbfilename) as conn:
             cur = conn.cursor()
@@ -61,7 +62,7 @@ class envSensor(object):
     def ts_persist(self, data,pressure_sea):
         payload = {
             "api_key": self.ts_api_key,
-            "field1": data.temperature,
+            "field1": data.temperature - self.tempadj,
             "field2": data.humidity,
             "field3": data.pressure,
             "field4": pressure_sea
@@ -99,7 +100,7 @@ class envSensor(object):
                 wx_timestamp = datetime.datetime.now().strftime("%m/%d %I:%M %p")
 
             #Convert readings to one decimal and add proper units
-            wx_temp = str(round(data.temperature,1)) + self.data.wx_units[0]
+            wx_temp = str(round(data.temperature - self.tempadj,1)) + self.data.wx_units[0]
             wx_humidity = str(round(data.humidity,1)) + "%"
             wx_pressure = str(round(pressure_sea,1)) + " " + self.data.wx_units[4]
 
