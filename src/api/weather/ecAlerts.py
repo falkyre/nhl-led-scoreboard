@@ -49,7 +49,7 @@ class ecWxAlerts(object):
 
             if num_alerts > 0:
                 # Only get the latest alert
-                i = -1
+                i = 0
                 # Create the warnings, watches and advisory lists from curr_alerts but only take the most recent one
 
                 wx_num_endings = len(curr_alerts.get("endings").get("value","0"))
@@ -58,6 +58,14 @@ class ecWxAlerts(object):
                 wx_num_advisory = len(curr_alerts.get("advisories").get("value","0"))
 
                 wx_total_alerts = wx_num_endings + wx_num_warning + wx_num_watch + wx_num_advisory
+               
+                warn_datetime = 0
+                watch_datetime = 0
+                advisory_datetime = 0
+                warning = []
+                watch = []
+                advisory = []
+                alerts = []
                 
                 if wx_num_warning > 0:
                     warn_date = curr_alerts["warnings"]["value"][i]["date"]
@@ -69,8 +77,10 @@ class ecWxAlerts(object):
                         wx_alert_time = warn_datetime.strftime("%m/%d %I:%M %p")
                     #Strip out the Warning at end of string for the title
                     wx_alert_title = curr_alerts["warnings"]["value"][i]["title"][:-(len(" Warning"))]
-                    self.data.wx_alerts = [wx_alert_title,"warning",wx_alert_time]
-                elif wx_num_watch > 0:
+                    warning = [wx_alert_title,"warning",wx_alert_time]
+                    alerts.append(warning)
+
+                if wx_num_watch > 0:
                     watch_date = curr_alerts["watches"]["value"][i]["date"]
                     #Convert to date for display
                     watch_datetime = datetime.datetime.strptime(watch_date,self.alert_date_format)
@@ -79,8 +89,10 @@ class ecWxAlerts(object):
                     else:
                         wx_alert_time = watch_datetime.strftime("%m/%d %I:%M %p")
                     wx_alert_title = curr_alerts["watches"]["value"][i]["title"][:-(len(" Watch"))]
-                    self.data.wx_alerts = [wx_alert_title,"watch",wx_alert_time]
-                elif wx_num_advisory > 0:
+                    watch = [wx_alert_title,"watch",wx_alert_time]
+                    alerts.append(watch)
+
+                if wx_num_advisory > 0:
                     advisory_date = curr_alerts["advisories"]["value"][i]["date"]
                     #Convert to date for display
                     advisory_datetime = datetime.datetime.strptime(advisory_date,self.alert_date_format)
@@ -91,8 +103,16 @@ class ecWxAlerts(object):
                         wx_alert_time = advisory_datetime.strftime("%m/%d %I:%M %p")
 
                     wx_alert_title = curr_alerts["advisories"]["value"][i]["title"][:-(len(" Advisory"))]
-                    self.data.wx_alerts = [wx_alert_title,"advisory",wx_alert_time]
-                elif wx_num_endings > 0:
+                    advisory = [wx_alert_title,"advisory",wx_alert_time]
+                    alerts.append(advisory)
+
+                #Find the latest alert time to set what the alert should be shown
+                #debug.info(alerts)
+                alerts.sort(key = lambda x: x[2],reverse=True)
+                #debug.info(alerts)
+                self.data.wx_alerts = alerts[0]
+
+                if wx_num_endings > 0:
                     ending_date = curr_alerts["endings"]["value"][i]["date"]
                     #Convert to date for display
                     ending_datetime = datetime.datetime.strptime(ending_date,self.alert_date_format)
@@ -104,9 +124,9 @@ class ecWxAlerts(object):
                     self.data.wx_alerts = [curr_alerts["endings"]["value"][i]["title"],"ended",wx_alert_time]
                     self.data.wx_alert_interrupt = False
                     self.weather_alert = 0
-                else:
-                    self.data.wx_alert_interrupt = False
-                    self.weather_alert = 0
+                #else:
+                #    self.data.wx_alert_interrupt = False
+                #    self.weather_alert = 0
 
                 if len(self.data.wx_alerts) > 0:
                     debug.info(self.data.wx_alerts)
