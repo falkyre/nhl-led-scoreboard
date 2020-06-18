@@ -13,7 +13,7 @@ class envSensor(object):
         self.sleepEvent = sleepEvent
         self.weather_frequency = data.config.weather_update_freq
         self.time_format = data.config.time_format
-        self.altitude = 292 #altitude in office
+        self.altitude = 250 #altitude in office
         self.tempadj = 2.5 #adjustment for bme280 self heating
         self.port = 1
         self.address = 0x76

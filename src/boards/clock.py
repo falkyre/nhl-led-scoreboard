@@ -17,6 +17,7 @@ class Clock:
         self.duration = duration
         #Is the weather clock json loaded
         self.wx_clock = False
+        self.tempswap = 0
         
         if not self.duration:
             self.duration = data.config.clock_board_duration
@@ -67,10 +68,13 @@ class Clock:
 
         # Display curr temp and humidity on clock, bottom
         if self.data.config.weather_show_on_clock and self.wx_clock:
-            if self.data.config.env_sensor:
-                weatherstr = "IN: {} {}".format(self.data.wx_current_sensor[1],self.data.wx_current_sensor[2])
+            self.tempswap += 1
+            swapit = self.tempswap % 5 #swap the in and out temperatures every 5 seconds 
+            if self.data.config.env_sensor and swapit == 0:
+                weatherstr = " IN: {} {}".format(self.data.wx_current_sensor[1],self.data.wx_current_sensor[2])
             else:
-                weatherstr = self.data.wx_current[3] + " " +self.data.wx_current[5]
+                weatherstr = "OUT: {} {}".format(self.data.wx_current[3],self.data.wx_current[5])
+
             self.matrix.draw_text_layout(
             self.layout.wx_display, 
             weatherstr
