@@ -69,16 +69,19 @@ class Clock:
         # Display curr temp and humidity on clock, bottom
         if self.data.config.weather_show_on_clock and self.wx_clock:
             self.tempswap += 1
-            swapit = self.tempswap % 5 #swap the in and out temperatures every 5 seconds 
-            if self.data.config.env_sensor and swapit == 0:
+            #weatherstr = "{} {}".format(self.data.wx_current[3],self.data.wx_current[5])
+
+            if self.data.config.env_sensor and self.tempswap in range(0,int(self.duration/2)):
                 weatherstr = " IN: {} {}".format(self.data.wx_current_sensor[1],self.data.wx_current_sensor[2])
-            else:
+
+            if self.data.config.env_sensor and self.tempswap in range(int(self.duration/2),self.duration):
                 weatherstr = "OUT: {} {}".format(self.data.wx_current[3],self.data.wx_current[5])
 
             self.matrix.draw_text_layout(
             self.layout.wx_display, 
             weatherstr
             ) 
+
             if len(self.data.wx_alerts) > 0:
                 # Draw Alert box (warning,watch,advisory)
                 #self.matrix.draw.rectangle([60, 25, self.matrix.width, 32], fill=(255,0,0)) # warning
