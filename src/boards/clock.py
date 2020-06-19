@@ -69,13 +69,13 @@ class Clock:
         # Display curr temp and humidity on clock, bottom
         if self.data.config.weather_show_on_clock and self.wx_clock:
             self.tempswap += 1
-            #weatherstr = "{} {}".format(self.data.wx_current[3],self.data.wx_current[5])
+            weatherstr = "OUT: {} {}".format(self.data.wx_current[3],self.data.wx_current[5])
 
             if self.data.config.env_sensor and self.tempswap in range(0,int(self.duration/2)):
                 weatherstr = " IN: {} {}".format(self.data.wx_current_sensor[1],self.data.wx_current_sensor[2])
 
-            if self.data.config.env_sensor and self.tempswap in range(int(self.duration/2),self.duration):
-                weatherstr = "OUT: {} {}".format(self.data.wx_current[3],self.data.wx_current[5])
+            #if self.data.config.env_sensor and self.tempswap in range(int(self.duration/2)+1,self.duration):
+            #    weatherstr = "OUT: {} {}".format(self.data.wx_current[3],self.data.wx_current[5])
 
             self.matrix.draw_text_layout(
             self.layout.wx_display, 
