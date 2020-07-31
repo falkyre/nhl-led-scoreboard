@@ -82,7 +82,8 @@
 			"data_feed": "EC",
 			"owm_apikey": "",
 			"update_freq": 5,
-			"show_on_clock": true
+			"show_on_clock": true,
+			"env_sensor": true
 		},
         "wxalert": {
             "alert_feed": "EC",
