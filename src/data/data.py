@@ -1,3 +1,9 @@
+"""
+    TODO: How this whole system works is getting complex for nothing and I need to recode this by sorting into seperate classes instead of having everything into a
+          single one.
+"""
+
+
 from datetime import datetime, timedelta
 from time import sleep
 import debug
@@ -9,11 +15,22 @@ from utils import get_lat_lng
 NETWORK_RETRY_SLEEP_TIME = 0.5
 
 
+
+
 def filter_list_of_games(games, teams):
     """
     Filter the list 'games' and keep only the games which the teams in the list 'teams' are part of.
     """
     return list(game for game in set(games) if {game.away_team_id, game.home_team_id}.intersection(set(teams)))
+
+def filter_list_of_series(series, teams):
+    """
+    Filter the list 'single_series' and keep only the ones which the teams in the list 'teams' are part of.
+
+        TODO: make a filter_list function that works for both list of games and list of series. need to add lost of attribute to look for and compare (intersection)
+    """
+
+    return list(single_series for single_series in set(series) if {single_series.matchupTeams[0].team.id, single_series.matchupTeams[1].team.id}.intersection(set(teams)))
 
 
 def prioritize_pref_games(games, teams):
@@ -32,6 +49,16 @@ def prioritize_pref_games(games, teams):
     cleaned_game_list = list(filter(None, list(dict.fromkeys(ordered_game_list))))
     return cleaned_game_list
 
+def prioritize_pref_series(series, teams):
+    """
+        Ordered list of preferred series to match the order of their corresponding team and clean the 'None' element
+        produced by the'map' function.
+    """
+    ordered_series_list = map(lambda team: next(
+        (single_series for single_series in series if single_series.matchupTeams[0].team.id == team or single_series.matchupTeams[1].team.id == team), None),
+                            teams)
+    cleaned_series_list = list(filter(None, list(dict.fromkeys(ordered_series_list))))
+    return cleaned_series_list
 
 class Data:
     def __init__(self, config):
@@ -48,7 +75,7 @@ class Data:
         # Get lat/long for dimmer and weather
         self.latlng = get_lat_lng(config.location)
         # Test for alerts
-        #self.latlng = [49.8955367, -97.1384584]
+        #self.latlng = [32.653,-83.7596]
         
         # Flag for if pushbutton has triggered
         self.pb_trigger = False
@@ -73,6 +100,7 @@ class Data:
 
         # For update checker, True means new update available from github
         self.newUpdate = False
+        self.UpdateRepo = "riffnshred/nhl-led-scoreboard"
         
 
         # Flag to determine when to refresh data
@@ -120,6 +148,9 @@ class Data:
 
         # Get refresh standings
         self.refresh_standings()
+
+        # Fetch the playoff data
+        self.refresh_playoff()
 
         # Get Covid 19 Data
         self.covid19 = covid19_data()
@@ -374,6 +405,49 @@ class Data:
             return []
 
     #
+    # Playoffs
+    def refresh_playoff(self):
+        attempts_remaining = 5
+        while attempts_remaining > 0:
+            try:
+                # Get the plaoffs data from the nhl api
+                self.playoffs = nhl_api.playoff(self.status.season_id)
+                # Check if there is any rounds avaialable and grab the most recent one available.
+                if self.playoffs.rounds:
+                    self.current_round = self.playoffs.rounds[str(self.playoffs.default_round)]
+                    self.current_round_name = self.current_round.names.name
+                    if self.current_round_name == "Stanley Cup Qualifier":
+                        self.current_round_name = "Qualifier"
+                
+                try:
+                    # Grab the series of the current round of playoff.
+                    self.series = self.current_round.series
+
+                    # Check if prefered team are part of the current round of playoff
+                    self.pref_series = prioritize_pref_series(filter_list_of_series(self.series, self.pref_teams), self.pref_teams)
+
+                    # If the user as set to show his favorite teams in the seriesticker
+                    if self.config.seriesticker_preferred_teams_only and self.pref_series:
+                        self.series = self.pref_series
+                except AttributeError:
+                    debug.error("The {} Season playoff has to started yet or unavailable".format(self.playoffs.season))
+                
+                break
+
+            except ValueError as error_message:
+                self.network_issues = True
+                debug.error("Failed to refresh the list of Series. {} attempt remaining.".format(attempts_remaining))
+                debug.error(error_message)
+                attempts_remaining -= 1
+                sleep(NETWORK_RETRY_SLEEP_TIME)
+                
+    def series_by_conference():
+        """
+            TODO:reorganize the list of series by conference and return the list
+        """
+        pass
+                
+    #
     # Offdays
 
     def is_pref_team_offday(self):
@@ -404,12 +478,15 @@ class Data:
         # Parse today's date and see if we should use today or yesterday
         self.refresh_current_date()
 
-        # Get all the team's data
+        # Update team's data
         self.get_teams_info()
 
-        # Fetch the games for today
+        # Update games for today
         self.refresh_games()
 
-        # Get refresh standings
+        # Update standings
         self.refresh_standings()
+        
+        # Update Playoff data
+        self.refresh_playoff()
 

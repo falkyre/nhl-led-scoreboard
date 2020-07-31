@@ -81,8 +81,7 @@ class Clock:
             self.layout.wx_display, 
             weatherstr
             ) 
-
-            if len(self.data.wx_alerts) > 0:
+            if len(self.data.wx_alerts) > 0 and self.data.wxalert_show_on_clock:
                 # Draw Alert box (warning,watch,advisory)
                 #self.matrix.draw.rectangle([60, 25, self.matrix.width, 32], fill=(255,0,0)) # warning
                 if self.data.wx_alerts[1] == "warning":  

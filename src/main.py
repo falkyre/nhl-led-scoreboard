@@ -8,6 +8,7 @@ from data.data import Data
 import threading
 from sbio.dimmer import Dimmer
 from sbio.pushbutton import PushButton
+from renderer.matrix import Matrix, TermMatrix
 from api.weather.ecWeather import ecWxWorker
 from api.weather.owmWeather import owmWxWorker
 from api.weather.ecAlerts import ecWxAlerts
@@ -17,22 +18,30 @@ from renderer.matrix import Matrix
 from update_checker import UpdateChecker
 from apscheduler.schedulers.background import BackgroundScheduler
 import debug
+import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.2.0 - Wx version"
+SCRIPT_VERSION = "1.3.0"
 
 
 def run():
     # Get supplied command line arguments
     commandArgs = args()
 
-    # Check for led configuration arguments
-    matrixOptions = led_matrix_options(commandArgs)
-    matrixOptions.drop_privileges = False
+    if commandArgs.terminal_mode:
+        height, width = os.popen('stty size', 'r').read().split()
+        termMatrix = TermMatrix()
+        termMatrix.width = int(width)
+        termMatrix.height = int(height)
+        matrix = Matrix(termMatrix)
+    else:
+        # Check for led configuration arguments
+        matrixOptions = led_matrix_options(commandArgs)
+        matrixOptions.drop_privileges = False
 
-    # Initialize the matrix
-    matrix = Matrix(RGBMatrix(options = matrixOptions))
+        # Initialize the matrix
+        matrix = Matrix(RGBMatrix(options = matrixOptions))
 
     # Print some basic info on startup
     debug.info("{} - v{} ({}x{})".format(SCRIPT_NAME, SCRIPT_VERSION, matrix.width, matrix.height))
@@ -83,13 +92,13 @@ def run():
             debug.error("No valid weather providers selected, skipping weather feed")
             data.config.weather_enabled = False
 
-    if data.config.weather_show_alerts and data.config.weather_enabled:
-        if data.config.weather_alert_feed.lower() == "ec":
+    if data.config.wxalert_show_alerts:
+        if data.config.wxalert_alert_feed.lower() == "ec":
             ecalert = ecWxAlerts(data,sleepEvent)
             ecalertThread = threading.Thread(target=ecalert.run,args=())
             ecalertThread.daemon = True
             ecalertThread.start()
-        elif data.config.weather_alert_feed.lower() == "nws":
+        elif data.config.wxalert_alert_feed.lower() == "nws":
             nwsalert = nwsWxAlerts(data,sleepEvent)
             nwsalertThread = threading.Thread(target=nwsalert.run,args=())
             nwsalertThread.daemon = True
@@ -101,8 +110,9 @@ def run():
     #
     # Run check for updates against github on a background thread on a scheduler
     #     
-    updateCheck = True
-    if updateCheck:
+
+    if commandArgs.updatecheck:
+        data.UpdateRepo = commandArgs.updaterepo
         scheduler = BackgroundScheduler()
         checkupdate = UpdateChecker(data,scheduler)
         scheduler.start()

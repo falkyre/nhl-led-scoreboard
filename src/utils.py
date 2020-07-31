@@ -16,7 +16,6 @@ def get_lat_lng(location):
         g = geocoder.ip('me')
         debug.info("location is: " + g.city + ","+ g.country + " " + str(g.latlng))
 
-     
     return g.latlng
 
 def get_file(path):
@@ -51,6 +50,9 @@ def args():
     parser.add_argument("--led-pwm-lsb-nanoseconds", action="store",
                         help="Base time-unit for the on-time in the lowest significant bit in nanoseconds. (Default: 130)",
                         default=130, type=int)
+    parser.add_argument("--led-pwm-dither-bits", action="store",
+                        help="Time dithering of lower bits (Default: 0)",
+                        default=0, type=int)
     parser.add_argument("--led-show-refresh", action="store_true",
                         help="Shows the current refresh rate of the LED panel.")
     parser.add_argument("--led-slowdown-gpio", action="store",
@@ -65,6 +67,10 @@ def args():
     parser.add_argument("--led-multiplexing", action="store",
                         help="Multiplexing type: 0 = direct; 1 = strip; 2 = checker; 3 = spiral; 4 = Z-strip; 5 = ZnMirrorZStripe; 6 = coreman; 7 = Kaler2Scan; 8 = ZStripeUneven. (Default: 0)",
                         default=0, type=int)
+    parser.add_argument("--led-panel-type", action="store", help="Needed to initialize special panels. Supported: 'FM6126A'", default="", type=str)
+    parser.add_argument("--terminal-mode", action="store", help="Run on terminal instead of matrix. (Default: False)", default=False, type=bool)                     
+    parser.add_argument("--updatecheck", action="store", help="Check for updates (Default: False)", default=False, type=bool)
+    parser.add_argument("--updaterepo", action="store", help="Github repo (Default: riffnshred/nhl-scoreboard)", default="riffnshred/nhl-led-scoreboard", type=str)
 
     return parser.parse_args()
 
@@ -85,6 +91,7 @@ def led_matrix_options(args):
     options.brightness = args.led_brightness
     options.pwm_lsb_nanoseconds = args.led_pwm_lsb_nanoseconds
     options.led_rgb_sequence = args.led_rgb_sequence
+    options.panel_type = args.led_panel_type
     try:
         options.pixel_mapper_config = args.led_pixel_mapper
     except AttributeError:
