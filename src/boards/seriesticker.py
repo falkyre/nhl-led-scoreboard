@@ -55,7 +55,7 @@ class Seriesticker:
                 fill=(255,255,255)
             )
             # Conference banner, Round Title
-            self.matrix.draw.rectangle([0,0,64,6], fill=color_banner_bg)
+            self.matrix.draw.rectangle([0,0,64,5], fill=color_banner_bg)
             self.matrix.draw_text(
                 (1, 1), 
                 banner_text, 
@@ -113,7 +113,7 @@ class Seriesticker:
             # get the scoreboard
             scoreboard = Scoreboard(overview, self.data)
 
-            if self.data.status.is_final(overview.status):
+            if self.data.status.is_final(overview.status) and hasattr(scoreboard, "winning_team"):
                 if scoreboard.winning_team == series.top_team.id:
                     winning_row = top_row
                     loosing_row = bottom_row
@@ -167,9 +167,6 @@ class Seriesticker:
             # Move back the indicator by 1 pixel if the number of games is even.
             if slides % 2:
               align = -1
-
-        # Measure the width of the indicator and then center it on the screen
-        indicator_length = (slides * spacing) - (spacing - 1)
 
         pixels = []
 

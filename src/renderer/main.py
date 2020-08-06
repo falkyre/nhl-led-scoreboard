@@ -6,6 +6,7 @@ from boards.boards import Boards
 from boards.clock import Clock
 from data.scoreboard import Scoreboard
 from renderer.scoreboard import ScoreboardRenderer
+from renderer.goal import GoalRenderer
 from utils import get_file
 import random
 import glob
@@ -65,6 +66,7 @@ class MainRenderer:
                 debug.info('This is a new day')
                 return
             self.data.refresh_data()
+            
             self.boards._off_day(self.data, self.matrix,self.sleepEvent)
 
     def __render_game_day(self):
@@ -106,15 +108,16 @@ class MainRenderer:
                     debug.info("Main event is in Intermission")
                     # Show Boards for Intermission
                     self.draw_end_period_indicator()
-                    #sleep(self.refresh_rate)
                     self.sleepEvent.wait(self.refresh_rate)
                     self.boards._intermission(self.data, self.matrix,self.sleepEvent)
                 else:
                     self.sleepEvent.wait(self.refresh_rate)
 
             elif self.status.is_game_over(self.data.overview.status):
+                print(self.data.overview.status)
                 debug.info("Game Over")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
+                self.check_new_goals()
                 self.__render_postgame(self.scoreboard)
                 # sleep(self.refresh_rate)
                 self.sleepEvent.wait(self.refresh_rate)
@@ -123,8 +126,9 @@ class MainRenderer:
                 """ Post Game state """
                 debug.info("FINAL")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
+                self.check_new_goals()
                 self.__render_postgame(self.scoreboard)
-                #sleep(self.refresh_rate)
+
                 self.sleepEvent.wait(self.refresh_rate)
                 if self.data._next_game():
                     debug.info("moving to the next preferred game")
@@ -159,12 +163,10 @@ class MainRenderer:
                 self.matrix.update_indicator()
 
 
-
     def __render_pregame(self, scoreboard):
         debug.info("Showing Pre-Game")
         self.matrix.clear()
         ScoreboardRenderer(self.data, self.matrix, scoreboard).render()
-
 
 
     def __render_postgame(self, scoreboard):
@@ -207,22 +209,30 @@ class MainRenderer:
             if away_id not in self.data.pref_teams and pref_team_only:
                 return
             self._draw_goal_animation(away_id, away_name)
+            GoalRenderer(self.data, self.matrix, self.sleepEvent, self.scoreboard.away_team).render()
         if home_score < home_goals:
             self.home_score = home_goals
             if home_id not in self.data.pref_teams and pref_team_only:
                 return
             self._draw_goal_animation(home_id, home_name)
-
+            GoalRenderer(self.data, self.matrix, self.sleepEvent, self.scoreboard.home_team).render()
+    
     def _draw_goal_animation(self, id=14, name="test"):
         debug.info('Score by team: ' + name)
 
         # Get the list of gif's under the preferred and opposing directory
-        preferred_gifs = glob.glob("assets/animations/preferred/*.gif")
-        opposing_gifs = glob.glob("assets/animations/opposing/*.gif")
+        all_gifs = glob.glob("assets/animations/goal/all/*.gif")
+        preferred_gifs = glob.glob("assets/animations/goal/preferred/*.gif")
+        opposing_gifs = glob.glob("assets/animations/goal/opposing/*.gif")
 
         filename = "assets/animations/goal_light_animation.gif"
         
         # Use alternate animations if there is any in the respective folder
+        if all_gifs:
+            # Set opposing team goal animation here
+            filename = random.choice(all_gifs)
+            debug.info("General animation is: " + filename)
+
         if opposing_gifs:
             # Set opposing team goal animation here
             filename = random.choice(opposing_gifs)
@@ -232,6 +242,7 @@ class MainRenderer:
             # Set your preferred team goal animation here
             filename = random.choice(preferred_gifs)
             debug.info("Preferred animation is: " + filename)
+        
 
 
         im = Image.open(get_file(filename))
@@ -260,11 +271,11 @@ class MainRenderer:
     def draw_end_period_indicator(self):
         """TODO: change the width depending how much time is left to the intermission"""
         color = self.matrix.graphics.Color(0, 255, 0)
-        self.matrix.graphics.DrawLine(self.matrix.matrix, 24, self.matrix.height - 2, 40, self.matrix.height - 2, color)
-        self.matrix.graphics.DrawLine(self.matrix.matrix, 23, self.matrix.height - 1, 41, self.matrix.height - 1, color)
+        self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 8, self.matrix.height - 2, (self.matrix.width * .5) + 8, self.matrix.height - 2, color)
+        self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 9, self.matrix.height - 1, (self.matrix.width * .5) + 9, self.matrix.height - 1, color)
 
     def draw_end_of_game_indicator(self):
         """TODO: change the width depending how much time is left to the intermission"""
         color = self.matrix.graphics.Color(255, 0, 0)
-        self.matrix.graphics.DrawLine(self.matrix.matrix, 24, self.matrix.height - 2, 40, self.matrix.height - 2, color)
-        self.matrix.graphics.DrawLine(self.matrix.matrix, 23, self.matrix.height - 1, 41, self.matrix.height - 1, color)
+        self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 8, self.matrix.height - 2, (self.matrix.width * .5) + 8, self.matrix.height - 2, color)
+        self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 9, self.matrix.height - 1, (self.matrix.width * .5) + 9, self.matrix.height - 1, color)

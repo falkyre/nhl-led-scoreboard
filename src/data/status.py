@@ -27,6 +27,7 @@ class Status:
                 else:
                     self.Final.append(status['detailedState'])
 
+
     def is_scheduled(self, status):
         return status in self.Preview
 
