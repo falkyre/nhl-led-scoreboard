@@ -66,7 +66,7 @@ class MainRenderer:
                 debug.info('This is a new day')
                 return
             self.data.refresh_data()
-            
+
             self.boards._off_day(self.data, self.matrix,self.sleepEvent)
 
     def __render_game_day(self):
@@ -89,10 +89,11 @@ class MainRenderer:
             # Display the pushbutton board
             if self.data.pb_trigger:
                 debug.info('PushButton triggered in game day loop....will display ' + self.data.config.pushbutton_state_triggered1 + ' board')
-                self.data.pb_trigger = False
+                if not self.data.screensaver:
+                    self.data.pb_trigger = False
                 #Display the board from the config
                 self.boards._pb_board(self.data, self.matrix, self.sleepEvent)
-            
+
             # Display the Weather Alert board
             if self.data.wx_alert_interrupt:
                 debug.info('Weather Alert triggered in game day loop....will display weather alert board')
@@ -100,8 +101,20 @@ class MainRenderer:
                 #Display the board from the config
                 self.boards._wx_alert(self.data, self.matrix, self.sleepEvent)
 
+            # Display the screensaver board
+            if self.data.screensaver:
+                if not self.data.pb_trigger:
+                    debug.info('Screensaver triggered in game day loop....')
+                    #self.data.wx_alert_interrupt = False
+                    #Display the board from the config
+                    self.boards._screensaver(self.data, self.matrix, self.sleepEvent)
+                else:
+                    self.data.pb_trigger = False
+
             if self.status.is_live(self.data.overview.status):
                 """ Live Game state """
+                #blocks the screensaver from running if game is live
+                self.data.screensaver_livegame = True
                 debug.info("Game is Live")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
                 self.check_new_goals()
@@ -130,7 +143,7 @@ class MainRenderer:
                 debug.info("FINAL")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
                 self.check_new_goals()
-                
+
                 self.__render_postgame(self.scoreboard)
 
                 self.sleepEvent.wait(self.refresh_rate)
@@ -163,7 +176,7 @@ class MainRenderer:
             self.data.refresh_overview()
             if self.data.network_issues:
                 self.matrix.network_issue_indicator()
-            
+
             if self.data.newUpdate and not self.data.config.clock_hide_indicators:
                 self.matrix.update_indicator()
 
@@ -198,7 +211,7 @@ class MainRenderer:
 
     def check_new_goals(self):
         debug.log("Check new goal")
-        
+
         pref_team_only = self.data.config.goal_anim_pref_team_only
         away_id = self.scoreboard.away_team.id
         away_name = self.scoreboard.away_team.name
@@ -221,7 +234,7 @@ class MainRenderer:
                     # Remove the first cached goal
                     self.goal_team_cache.pop(0)
             except IndexError:
-                print("crash")
+                debug.error("The scoreboard object failed to get the goal details, trying on the next data refresh")
 
         if away_score < away_goals:
             self.away_score = away_goals
@@ -230,7 +243,7 @@ class MainRenderer:
                 return
             # run the goal animation
             self._draw_goal_animation(away_id, away_name)
-            
+
 
         if home_score < home_goals:
             self.home_score = home_goals
@@ -239,10 +252,8 @@ class MainRenderer:
                 return
             # run the goal animation
             self._draw_goal_animation(away_id, home_name)
-            
-        
-        print(self.goal_team_cache)
-    
+
+
     def _draw_goal_animation(self, id=14, name="test"):
         debug.info('Score by team: ' + name)
 
@@ -252,7 +263,7 @@ class MainRenderer:
         opposing_gifs = glob.glob("assets/animations/goal/opposing/*.gif")
 
         filename = "assets/animations/goal_light_animation.gif"
-        
+
         # Use alternate animations if there is any in the respective folder
         if all_gifs:
             # Set opposing team goal animation here
@@ -268,7 +279,7 @@ class MainRenderer:
             # Set your preferred team goal animation here
             filename = random.choice(preferred_gifs)
             debug.info("Preferred animation is: " + filename)
-        
+
 
 
         im = Image.open(get_file(filename))

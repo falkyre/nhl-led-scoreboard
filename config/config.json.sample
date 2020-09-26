@@ -1,10 +1,11 @@
 {
-	"debug": true,
+	"debug": false,
+	"loglevel": "INFO",
 	"live_mode": false,
 	"preferences": {
 		"time_format": "24h",
 		"end_of_day": "8:00",
-		"location": "Winnipeg, MB",
+		"location": "",
 		"live_game_refresh_rate": 10,
 		"teams": [
 			"Flames",
@@ -21,7 +22,6 @@
 		"off_day": [
 			"covid_19",
 			"clock"
-			
 		],
 		"scheduled": [
 			"team_summary",
@@ -57,7 +57,11 @@
 		},
 		"clock": {
 			"duration": 15,
-			"hide_indicator": false
+			"hide_indicator": false,
+			"preferred_team_colors": true,
+            "clock_rgb": "",
+            "date_rgb": "",
+            "flash_seconds": true
 		},
         "covid19": {
             "worldwide_enabled": false,
@@ -84,21 +88,38 @@
 			"update_freq": 5,
 			"show_on_clock": true,
 			"env_sensor": true
+			"forecast_enabled": true,
+			"forecast_days": 3,
+			"forecast_update": 1
 		},
         "wxalert": {
             "alert_feed": "EC",
             "update_freq": 5,
             "show_alerts": true,
+			"nws_show_expire": false,
             "alert_title": true,
             "scroll_alert": true,
             "alert_duration": 5,
 			"show_on_clock": true
-        }	
+        }
 	},
 	"sbio": {
+		"screensaver": {
+            "enabled": true,
+			"animations": true,
+            "start": "22:00",
+            "stop": "22:05",
+            "data_updates": false,
+			"motionsensor": true,
+            "pin": 24,
+            "delay": 30
+        },
 		"dimmer": {
 			"enabled": false,
 			"source": "software",
+			"daytime": "",
+            "nighttime": "",
+            "offset": 90,
 			"frequency": 5,
 			"light_level_lux": 400,
 			"mode": "always",
