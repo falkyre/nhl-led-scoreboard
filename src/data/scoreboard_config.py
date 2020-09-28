@@ -28,7 +28,7 @@ class ScoreboardConfig:
 
 
         # Goal animation
-        self.goal_anim_pref_team_only = json["goal_animations"]["pref_team_only"]
+        self.goal_anim_pref_team_only = json["preferences"]["goal_animations"]["pref_team_only"]
 
         #Screen Saver entries
         self.screensaver_enabled = json["sbio"]["screensaver"]["enabled"]
@@ -158,6 +158,11 @@ class ScoreboardConfig:
         ))
 
         self.config = Config(size)
+
+        if args.testScChampions != None:
+            self.testScChampions = args.testScChampions
+        else:
+            self.testScChampions = False
 
     def read_json(self, filename):
         # Find and return a json file
