@@ -13,14 +13,15 @@ from boards.covid_19 import Covid_19
 from boards.pbdisplay import pbDisplay
 from boards.wxWeather import wxWeather
 from boards.wxAlert import wxAlert
+from boards.christmas import Christmas
 from boards.wxForecast import wxForecast
 from boards.screensaver import screenSaver
+from boards.stanley_cup_champions import StanleyCupChampions
 from time import sleep
 
 
 class Boards:
     def __init__(self):
-        # self.standings_board = Standings(config, matrix)
         pass
 
     # Board handler for PushButton
@@ -223,6 +224,9 @@ class Boards:
     def seriesticker(self, data, matrix,sleepEvent):
         if data.status.is_playoff(data.today, data.playoffs):
             Seriesticker(data, matrix, sleepEvent).render()
+    
+    def stanley_cup_champions(self, data, matrix,sleepEvent):
+        StanleyCupChampions(data, matrix, sleepEvent).render()
 
     def standings(self, data, matrix,sleepEvent):
         #Try making standings a thread
@@ -251,3 +255,6 @@ class Boards:
 
     def covid_19(self, data, matrix,sleepEvent):
         Covid_19(data, matrix, sleepEvent)
+
+    def christmas(self, data, matrix,sleepEvent):
+        Christmas(data, matrix, sleepEvent).draw()

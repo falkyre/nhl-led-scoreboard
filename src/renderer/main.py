@@ -5,6 +5,8 @@ import debug
 from boards.boards import Boards
 from boards.clock import Clock
 from boards.stanley_cup_champions import StanleyCupChampions
+from boards.seriesticker import Seriesticker
+import data.refresh
 from data.scoreboard import Scoreboard
 from renderer.scoreboard import ScoreboardRenderer
 from renderer.goal import GoalRenderer
@@ -26,6 +28,15 @@ class MainRenderer:
         self.alternate_data_counter = 1
 
     def render(self):
+        if self.data.config.testing_mode:
+            debug.info("Rendering in Testing Mode")
+            while True:
+                Seriesticker(self.data, self.matrix, self.sleepEvent).render()
+                data.refresh.daily(self.data)
+                self.sleepEvent.wait(1)
+                debug.info("Testing Mode Refresh")
+
+
         while self.data.network_issues:
             Clock(self.data, self.matrix, self.sleepEvent, duration=60)
             self.data.refresh_data()
@@ -33,7 +44,7 @@ class MainRenderer:
         while True:
             try:
                 debug.info('Rendering...')
-                self.data.refresh_data()
+                
                 if self.status.is_offseason(self.data.date()):
                     # Offseason (Show offseason related stuff)
                     debug.info("It's offseason")
@@ -55,6 +66,8 @@ class MainRenderer:
                     else:
                         debug.info("Game Day Wooooo")
                         self.__render_game_day()
+                
+                self.data.refresh_data()
 
             except AttributeError as e:
                 debug.log(f"ERROR WHILE RENDERING: {e}")
@@ -68,6 +81,7 @@ class MainRenderer:
             debug.log('PING !!! Render off day')
             if self.data._is_new_day():
                 debug.info('This is a new day')
+                data.refresh.daily(self.data)
                 return
             self.data.refresh_data()
             self.boards._off_day(self.data, self.matrix,self.sleepEvent)
@@ -137,7 +151,11 @@ class MainRenderer:
                 debug.info("Game Over")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
                 self.check_new_goals()
-                self.check_stanley_cup_champion()
+                if self.data.isPlayoff and self.stanleycup_round:
+                    self.check_stanley_cup_champion()
+                    if self.data.ScChampions_id:
+                        StanleyCupChampions(self.data, self.data.ScChampions_id, self.matrix, self.sleepEvent).render()
+                
                 self.__render_postgame(self.scoreboard)
 
                 self.sleepEvent.wait(self.refresh_rate)
@@ -147,7 +165,10 @@ class MainRenderer:
                 debug.info("FINAL")
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
                 self.check_new_goals()
-                self.check_stanley_cup_champion()
+                if self.data.isPlayoff and self.stanleycup_round:
+                    self.check_stanley_cup_champion()
+                    if self.data.ScChampions_id:
+                        StanleyCupChampions(self.data, self.matrix, self.sleepEvent).render()
                 self.__render_postgame(self.scoreboard)
 
                 self.sleepEvent.wait(self.refresh_rate)
@@ -238,6 +259,9 @@ class MainRenderer:
                     self.goal_team_cache.pop(0)
             except IndexError:
                 debug.error("The scoreboard object failed to get the goal details, trying on the next data refresh")
+            except KeyError:
+                debug.error("Last Goal is a No goal. Or the API is missing some information.")
+                self.goal_team_cache.pop(0)
 
         if away_score < away_goals:
             self.away_score = away_goals
@@ -254,12 +278,12 @@ class MainRenderer:
             if home_id not in self.data.pref_teams and pref_team_only:
                 return
             # run the goal animation
-            self._draw_goal_animation(away_id, home_name)
-
-
+            self._draw_goal_animation(home_id, home_name)
+            
+    
     def _draw_goal_animation(self, id=14, name="test"):
         debug.info('Score by team: ' + name)
-
+        preferred_team_only = self.data.config.goal_anim_pref_team_only
         # Get the list of gif's under the preferred and opposing directory
         all_gifs = glob.glob("assets/animations/goal/all/*.gif")
         preferred_gifs = glob.glob("assets/animations/goal/preferred/*.gif")
@@ -273,7 +297,7 @@ class MainRenderer:
             filename = random.choice(all_gifs)
             debug.info("General animation is: " + filename)
 
-        if opposing_gifs:
+        if opposing_gifs and not preferred_team_only:
             # Set opposing team goal animation here
             filename = random.choice(opposing_gifs)
             debug.info("Opposing animation is: " + filename)
@@ -319,12 +343,6 @@ class MainRenderer:
         color = self.matrix.graphics.Color(255, 0, 0)
         self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 8, self.matrix.height - 2, (self.matrix.width * .5) + 8, self.matrix.height - 2, color)
         self.matrix.graphics.DrawLine(self.matrix.matrix, (self.matrix.width * .5) - 9, self.matrix.height - 1, (self.matrix.width * .5) + 9, self.matrix.height - 1, color)
-
-    def check_stanley_cup_champion(self):
-        if self.data.isPlayoff and self.data.stanleycup_round:
-            for x in range(len(self.data.current_round.series[0].matchupTeams)):
-                if self.data.current_round.series[0].matchupTeams[x].seriesRecord.wins >= 4:
-                    StanleyCupChampions(self.data, self.data.current_round.series[0].matchupTeams[x].team.id, self.matrix, self.sleepEvent).render()
 
     def test_stanley_cup_champion(self, team_id):
         StanleyCupChampions(self.data, team_id, self.matrix, self.sleepEvent).render()

@@ -15,7 +15,7 @@ import shutil
 
 from time import sleep
 
-SCRIPT_VERSION = "1.4.0"
+SCRIPT_VERSION = "1.4.1"
 
 TEAMS = ['Avalanche','Blackhawks','Blues','Blue Jackets','Bruins','Canadiens','Canucks','Capitals','Coyotes','Devils','Ducks','Flames','Flyers',
     'Golden Knights','Hurricanes','Islanders','Jets','Kings','Maple Leafs','Lightning','Oilers','Panthers','Penguins','Predators',
@@ -26,6 +26,7 @@ SECTIONS = ['general','preferences','states','boards','sbio']
 STATES = ['off_day','scheduled','intermission','post_game']
 #Note: for boards, the covid19 in config is NOT the same name as the covid_19 python function
 #the boards listed below are what's listed in the config
+# These are boards that have configuration.  If your board does not have any config, you don't need to add it
 BOARDS = ['clock','weather','wxalert','scoreticker','seriesticker','standings','covid19']
 SBIO = ['pushbutton','dimmer','screensaver']
 
@@ -381,6 +382,7 @@ def get_canada_prov(canada_prov_index,canada_prov_choices,pref_canada_prov,qmark
     return answers['canada_prov']
 
 def general_settings(default_config,qmark):
+
     questions = [
 
         {
@@ -535,15 +537,15 @@ def states_settings(default_config,qmark,setup_type):
     if setup_type != "full":
         thestates = (
             questionary.checkbox(
-                "Select states(s) to configure", choices=STATES, style=custom_style_dope,qmark=qmark
+                "Select states(s) to configure (no selection defaults to all states)", choices=STATES, style=custom_style_dope,qmark=qmark
             ).ask()
-            or []
+            or STATES
         )
     else:
         thestates = STATES
 
     for astate in thestates:
-        board_list = ['clock','weather','wxalert','scoreticker','seriesticker','standings','team_summary','covid_19']
+        board_list = ['clock','weather','wxalert','scoreticker','seriesticker','standings','team_summary','covid_19','stanley_cup_champions','christmas']
 
         boards_selected = []
         board = None
@@ -578,6 +580,7 @@ def states_settings(default_config,qmark,setup_type):
 
 def scoreticker(default_config,qmark):
     # Get scoreticker config
+    scoreticker_default = get_default_value(default_config,['boards','scoreticker'],"string")
 
     scoreticker_questions = [
         {
@@ -600,10 +603,13 @@ def scoreticker(default_config,qmark):
 
     scoreticker_conf = prompt(scoreticker_questions,style=custom_style_dope)
 
-    return scoreticker_conf
+    scoreticker_default.update(scoreticker_conf)
+
+    return scoreticker_default
 
 def seriesticker(default_config,qmark):
     # Get seriesticker config
+    seriesticker_default = get_default_value(default_config,['boards','seriesticker'],"string")
 
     seriesticker_questions = [
         {
@@ -626,9 +632,14 @@ def seriesticker(default_config,qmark):
 
     seriesticker_conf = prompt(seriesticker_questions,style=custom_style_dope)
 
-    return seriesticker_conf
+    seriesticker_default.update(seriesticker_conf)
+
+    return seriesticker_default
 
 def standings(default_config,qmark):
+
+    standings_default = get_default_value(default_config,['boards','standings'],"string")
+
     standings_questions = [
         {
             'type': 'confirm',
@@ -665,9 +676,13 @@ def standings(default_config,qmark):
 
     standings_conf = prompt(standings_questions,style=custom_style_dope)
 
-    return standings_conf
+    standings_default.update(standings_conf)
+
+    return standings_default
 
 def clock(default_config,qmark):
+    clock_default = get_default_value(default_config,['boards','clock'],"string")
+
     clock_questions = [
         {
             'type': 'input',
@@ -721,7 +736,9 @@ def clock(default_config,qmark):
 
     clock_conf = prompt(clock_questions,style=custom_style_dope)
 
-    return clock_conf
+    clock_default.update(clock_conf)
+
+    return clock_default
 
 def covid19(default_config,qmark):
     # COVID board questions
@@ -963,6 +980,7 @@ def weather(default_config,qmark):
                     'qmark': qmark,
                     'validate': lambda val: True if val.isdecimal() and int(val) >= 1 and int(val) <= 3 else 'Must be a number and greater or equal than 1 and less than or equal to 3',
                     'filter': lambda val: int(val),
+                    "when": lambda x: x["forecast_enabled"],
                     'message': 'Number of days forecast to show?(minimum 1, max 3)',
                     'default': get_default_value(default_config,['boards','weather','forecast_days'],"int") or '1'
                 },
@@ -972,6 +990,7 @@ def weather(default_config,qmark):
                     'qmark': qmark,
                     'validate': lambda val: True if val.isdecimal() and int(val) >= 1 else 'Must be a number and greater or equal than 1',
                     'filter': lambda val: int(val),
+                    "when": lambda x: x["forecast_enabled"],
                     'message': 'How often to update weather forecast in hours?(minimum 1)',
                     'default': get_default_value(default_config,['boards','weather','forecast_update'],"int") or '1'
                 },
@@ -1082,7 +1101,7 @@ def board_settings(default_config,qmark,setup_type):
     if setup_type != "full":
         theboards = (
             questionary.checkbox(
-                "Select boards(s) to configure (no selection defaults to all boards)", choices=BOARDS, style=custom_style_dope,qmark=qmark
+                "Select board(s) to configure (no selection defaults to all boards)", choices=BOARDS, style=custom_style_dope,qmark=qmark
             ).ask()
             or BOARDS
         )
@@ -1098,12 +1117,16 @@ def board_settings(default_config,qmark,setup_type):
             boards_config['standings'] = standings(default_config,qmark)
         if aboard == 'clock':
             boards_config['clock'] = clock(default_config,qmark)
+            #boards_config.update(clock(default_config,qmark))
         if aboard == 'covid19':
             boards_config['covid19'] = covid19(default_config,qmark)
         if aboard == 'weather':
             boards_config['weather'] = weather(default_config,qmark)
         if aboard == 'wxalert':
             boards_config['wxalert'] = wxalert(default_config,qmark)
+
+    #boards_dict = {'boards':{}}
+    #boards_dict = boards_config
 
     return boards_config
 
@@ -1471,18 +1494,22 @@ def main():
     #Check to see if the user wants to validate an existing config.json against the schema
     #Only from command line
 
-    if args.check:
-        conffile = "{0}/config.json".format(args.confdir)
-        schemafile = "{0}/config.schema.json".format(args.confdir)
+    #Change to check on running app every time, if config is not valid, exit.
 
-        confpath = get_file(conffile)
-        schemapath = get_file(schemafile)
-        print("Now validating config......")
-        (valid,msg) = validateConf(confpath,schemapath)
-        if valid:
-            print("Your config.json passes validation and can be used with nhl led scoreboard",GREEN)
-        else:
-            print("Your config.json fails validation: error: [{0}]".format(msg),RED)
+    conffile = "{0}/config.json".format(args.confdir)
+    schemafile = "{0}/config.schema.json".format(args.confdir)
+
+    confpath = get_file(conffile)
+    schemapath = get_file(schemafile)
+    print("Now validating config......")
+    (valid,msg) = validateConf(confpath,schemapath)
+    if valid:
+        print("Your config.json passes validation and can be used with nhl led scoreboard",GREEN)
+    else:
+        print("Your config.json fails validation: error: [{0}]".format(msg),RED)
+        sys.exit(0)
+
+    if args.check:
         sys.exit(0)
 
     #Check to see if there was a team name on the command line, if so, create a new config.json from
@@ -1526,7 +1553,6 @@ def main():
     else:
         #Do full setup or by sections?
         setup_type = questionary.select("What kind of setup do you want?",choices=['full','sections'],style=custom_style_dope,qmark=qmark).ask()
-        print(setup_type)
 
 
     nhl_config = default_config
@@ -1556,11 +1582,11 @@ def main():
 
         if section == "boards":
             boards_config = board_settings(default_config,qmark,setup_type)
-            nhl_config.update(boards_config)
+            nhl_config['boards'] = boards_config
 
         if section == "sbio":
             sbio_config = sbio_settings(default_config,qmark,setup_type)
-            nhl_config.update(sbio_config)
+            nhl_config['sbio'] = sbio_config
 
 
     #Prepare to output to config.json file
@@ -1569,4 +1595,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

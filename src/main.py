@@ -26,7 +26,7 @@ import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.4.1"
+SCRIPT_VERSION = "1.5.1"
 
 
 def run():
@@ -119,7 +119,7 @@ def run():
     #
     if commandArgs.updatecheck:
         data.UpdateRepo = commandArgs.updaterepo
-        checkupdate = UpdateChecker(data,scheduler)
+        checkupdate = UpdateChecker(data,scheduler,commandArgs.ghtoken)
 
     if data.config.dimmer_enabled:
         dimmer = Dimmer(data, matrix,scheduler)
