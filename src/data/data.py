@@ -166,11 +166,11 @@ class Data:
         # Fetch the playoff data
         self.refresh_playoff()
 
-        # Stanley cup champions
-        self.ScChampions_id = self.check_stanley_cup_champion()
-
         # Playoff Flag
         self.isPlayoff = False
+
+        # Stanley cup champions
+        self.ScChampions_id = self.check_stanley_cup_champion()
 
         # Stanley cup round flag
         self.stanleycup_round = False
@@ -259,7 +259,7 @@ class Data:
                 self.pref_games = filter_list_of_games(self.games, self.pref_teams)
                 if self.config.preferred_teams_only and self.pref_teams:
                     self.games = self.pref_games
-
+                
                 if not self.is_pref_team_offday():
                     self.pref_games = prioritize_pref_games(self.pref_games, self.pref_teams)
                     self.check_all_pref_games_final()
@@ -426,7 +426,6 @@ class Data:
             TODO:
                 Add a refresh function to the Series object instead and trigger a refresh only at specific time in the renderer.(End of a game, new day)
         """
-        print("hello")
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
@@ -457,11 +456,9 @@ class Data:
                             self.series_list = self.pref_series
                         
                         for s in self.series_list:
-                            print(s)
                             self.series.append(Series(s,self))
                         
                         self.isPlayoff = True
-                        print(self.isPlayoff)
                     except AttributeError:
                         debug.error("The {} Season playoff has not started yet or is unavailable".format(self.playoffs.season))
                         

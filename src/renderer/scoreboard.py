@@ -1,5 +1,5 @@
 from PIL import Image, ImageFont, ImageDraw, ImageSequence
-from utils import center_text, convert_date_format
+from utils import center_text, convert_date_format, get_file
 from renderer.logos import LogoRenderer
 
 
@@ -18,7 +18,7 @@ class ScoreboardRenderer:
             self.matrix,
             data.config,
             self.layout.home_logo,
-            self.scoreboard.home_team,
+            self.scoreboard.home_team.abbrev,
             'scoreboard',
             'home'
         )
@@ -26,12 +26,13 @@ class ScoreboardRenderer:
             self.matrix,
             data.config,
             self.layout.away_logo,
-            self.scoreboard.away_team,
+            self.scoreboard.away_team.abbrev,
             'scoreboard',
             'away'
         )
 
     def render(self):
+        self.matrix.clear()
         self.away_logo_renderer.render()
         self.home_logo_renderer.render()
 
@@ -107,6 +108,10 @@ class ScoreboardRenderer:
         result = self.scoreboard.periods.clock
         score = '{}-{}'.format(self.scoreboard.away_team.goals, self.scoreboard.home_team.goals)
         date = convert_date_format(self.scoreboard.date)
+        
+        #Work in progress. testing gradients
+        #gradient = Image.open(get_file('assets/images/scoreboard_center_gradient.png'))
+        #self.matrix.draw_image((64,0), gradient, align="center")
 
         # Draw the info
         self.matrix.draw_text_layout(
