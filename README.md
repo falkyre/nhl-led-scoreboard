@@ -15,6 +15,8 @@ JJ
 ## Description
 This is a Python software made to display NHL live scores, stats, and more of your favorite teams, on a Raspberry Pi driven RGB LED matrix. An LED matrix panel (also called a Dot led matrix or dot matrix) is a panel of LEDs used to build huge displays as you see in arenas, malls, time square, etc...
 
+## Disclaimer 
+This project relies on an undocumented NHL API which is also what nhl.com use. The data is not always accurate and might have delays and errors that's out of our control.
 
 ## Tutorials from other source
 >"I followed instructions from somewhere else and I'm having issues"
@@ -173,9 +175,13 @@ this page.
 
 [Raspbian Buster Lite Installation](https://medium.com/@danidudas/install-raspbian-jessie-lite-and-setup-wi-fi-without-access-to-command-line-or-using-the-network-97f065af722e)
 
+
 #### Time Zones
 Before you start installing anything, make sure your raspberry pi is set to your local time zone. Usually, you do so when you install Raspian, but if you think you skipped that part, you can change it by running `sudo raspi-config`
 
+#### Intalling Git
+You will need to install Git on your raspberry pi in order to download the software. To do so, run this command. 
+`sudo apt install git`
 
 #### Installing the NHL scoreboard software
 This installation process might take some time because it will install all the dependencies listed below.
@@ -183,31 +189,36 @@ This installation process might take some time because it will install all the d
 ```
 git clone --recursive https://github.com/riffnshred/nhl-led-scoreboard
 cd nhl-led-scoreboard/
-sudo chmod +x scripts/install.sh
-sudo ./scripts/install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
 [rpi-rgb-led-matrix ](https://github.com/hzeller/rpi-rgb-led-matrix/tree/master/bindings/python#building): The open-source library that allows the Raspberry Pi to render on the LED matrix.
 [requests](https://requests.kennethreitz.org/en/master/): To call the API and manipulate the received data.
 
 ### *Important Step after installation.*
-If it's a first install of the software, there is no config.json only a config.json.sample. This is normal. You need to configure your scoreboard. Fallow the steps in the [Configuration](#configuration) section of this documentation.
+If it's a first install of the software, there is no config.json only a config.json.sample. This is normal. You need to configure your scoreboard. Follow the steps in the [Configuration](#configuration) section of this documentation.
 
 
 #### Updating your software.
-If you undate from any version that was released **before V1.0.0**, run these commands to update.
-`git reset --hard`
-`git checkout master`
-`sudo git pull`
-`sudo chmod +x scripts/install.sh`
-`sudo ./scripts/install.sh`.
-
-If your board runs **any V1 version**, simply run the install like so.
-`sudo chmod +x scripts/install.sh`
-`sudo ./scripts/install.sh`
+```
+git reset --hard
+git checkout master
+git pull
+chmod +x scripts/install.sh
+./scripts/install.sh
+```
 
 If you face any issue after updating, rerun the install and it should fix it. otherwise check the issue section to see if a solution as been found for your problem. If not open an issue and I'll find a solution.
 
+#### Removing/uninstalling the software
+Sometimes, the only way to fix the issues after an update is to delete and reinstall. From the nhl-led-scoreboard folder, run these commands
+```
+cd
+sudo rm -R nhl-led-scoreboard
+```
+
+Than run the installation commands above.
 
 ## Testing and Optimization
 If you have been using a Led matrix on a raspberry pi before and know how to run it properly skip this part. 
