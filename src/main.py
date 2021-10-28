@@ -28,7 +28,7 @@ import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.6.5"
+SCRIPT_VERSION = "1.6.8"
 
 
 def run():
@@ -156,7 +156,6 @@ def run():
         pushbuttonThread.daemon = True
         pushbuttonThread.start()
     
-
     MainRenderer(matrix, data, sleepEvent).render()
 
 

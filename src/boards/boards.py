@@ -13,6 +13,7 @@ from boards.pbdisplay import pbDisplay
 from boards.wxWeather import wxWeather
 from boards.wxAlert import wxAlert
 from boards.christmas import Christmas
+from boards.seasoncountdown import SeasonCountdown
 from boards.wxForecast import wxForecast
 from boards.screensaver import screenSaver
 from boards.stanley_cup_champions import StanleyCupChampions
@@ -161,7 +162,7 @@ class Boards:
             #         bord_index -= 1
             #     else:
             #         data.pb_trigger = False
-
+        
             board(data, matrix,sleepEvent)
 
             if bord_index >= (len(data.config.boards_intermission) - 1):
@@ -259,3 +260,6 @@ class Boards:
 
     def christmas(self, data, matrix,sleepEvent):
         Christmas(data, matrix, sleepEvent).draw()
+
+    def seasoncountdown(self, data, matrix,sleepEvent):
+        SeasonCountdown(data, matrix, sleepEvent).draw()
