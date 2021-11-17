@@ -27,12 +27,13 @@ import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.6.8"
+SCRIPT_VERSION = "1.6.8_alpine"
 
 
 def run():
     # Kill the splash screen if active
-    stop_splash_service()
+    # Removed from alpine linux as it's not used for this OS
+    # stop_splash_service()
 
     # Get supplied command line arguments
     commandArgs = args()
