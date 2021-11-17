@@ -34,7 +34,7 @@ import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.6.8"
+SCRIPT_VERSION = "1.6.8_alpine"
 
 
 def run():
