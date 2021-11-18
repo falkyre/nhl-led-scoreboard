@@ -1,0 +1,18 @@
+# install some packages
+apk add --no-cache py3-pip
+apk add --no-cache py3-dateutil
+apk add --no-cache py3-numpy
+apk add --no-cache py3-pillow
+apk add --no-cache py3-rpigpio
+apk add --no-cache py3-lxml
+apk add --no-cache py3-libxml2
+apk add --no-cache py3-aiohttp
+apk add --no-cache py3-paho-mqtt
+apk add --no-cache py3-setuptools
+apk add --no-cache py3-gpiozero
+apk add --no-cache py3-cairosvg
+apk add --no-cache py3-regex
+apk add --no-cache py3-geocoder
+
+# you can also execute arbitrary bash
+echo "🚨  ALL GOOD TO GO"
