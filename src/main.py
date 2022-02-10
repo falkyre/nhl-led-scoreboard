@@ -34,7 +34,7 @@ import os
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.6.x.beta"
+SCRIPT_VERSION = "1.7.x.beta"
 
 
 def run():
@@ -164,6 +164,11 @@ def run():
         sbmqttThread = threading.Thread(target=sbmqtt.run, args=())
         sbmqttThread.daemon = True
         sbmqttThread.start()
+
+    try:
+        result=1/0
+    except Exception as e:
+        debug.exception("Test Exception",e)
 
     MainRenderer(matrix, data, sleepEvent,sbQueue).render()
 
