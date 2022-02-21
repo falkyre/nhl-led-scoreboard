@@ -168,6 +168,7 @@ class ScoreboardConfig:
         # Find and return a json file
 
         j = {}
+        msg = ""
         path = get_file("config/{}".format(filename))
         if os.path.isfile(path):
             try:

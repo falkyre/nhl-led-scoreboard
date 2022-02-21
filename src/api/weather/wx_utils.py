@@ -1,11 +1,17 @@
 import math
 import csv
+import pathlib
 
 def get_csv(csvfile):
     #Load csv to get data into a list
     #Make sure file exists
-    csv_path = "src/api/weather/" + csvfile
-    return list(csv.DictReader(open(csv_path)))
+    the_list = []
+    csv_path = pathlib.Path(__file__).parent / csvfile
+    
+    if csv_path.exists():
+        the_list = list(csv.DictReader(open(csv_path,encoding="utf8")))
+        
+    return the_list
 
 
 #Take a degree (float) and convert to text and icon   

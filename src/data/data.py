@@ -10,7 +10,7 @@ import nhl_api
 from data.playoffs import Series
 from data.status import Status
 from utils import get_lat_lng
-
+from rich import inspect
 
 NETWORK_RETRY_SLEEP_TIME = 0.5
 
@@ -575,6 +575,9 @@ class Data:
 
         # Update games for today
         self.refresh_games()
+        
+        if self.config.debug:
+           inspect(self,methods=True)
 
     def refresh_daily(self):
         print('refreshing data')

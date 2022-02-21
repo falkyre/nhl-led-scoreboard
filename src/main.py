@@ -12,9 +12,9 @@ from utils import args, led_matrix_options, scheduler_event_listener
 from data.data import Data
 import threading
 import queue
-from sbio.dimmer import Dimmer
-from sbio.pushbutton import PushButton
-from sbio.motionsensor import Motion
+#from sbio.dimmer import Dimmer
+#from sbio.pushbutton import PushButton
+#from sbio.motionsensor import Motion
 from sbio.screensaver import screenSaver
 from sbio.sbMQTT import sbMQTT
 from renderer.matrix import Matrix, TermMatrix
@@ -31,10 +31,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from renderer.loading_screen import Loading
 import debug
 import os
+import platform
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "1.6.7"
+SCRIPT_VERSION = "1.6.7-emulator"
 
 
 def run():
@@ -138,23 +139,25 @@ def run():
         data.UpdateRepo = commandArgs.updaterepo
         checkupdate = UpdateChecker(data,scheduler,commandArgs.ghtoken)
 
-    if data.config.dimmer_enabled:
-        dimmer = Dimmer(data, matrix,scheduler)
+    # if data.config.dimmer_enabled:
+    #     dimmer = Dimmer(data, matrix,scheduler)
 
     screensaver = None
     if data.config.screensaver_enabled:
         screensaver = screenSaver(data, matrix, sleepEvent, scheduler)
-        if data.config.screensaver_motionsensor:
-            motionsensor = Motion(data,matrix,sleepEvent,scheduler,screensaver)
-            motionsensorThread = threading.Thread(target=motionsensor.run, args=())
-            motionsensorThread.daemon = True
-            motionsensorThread.start()
-
-    if data.config.pushbutton_enabled:
-        pushbutton = PushButton(data,matrix,sleepEvent)
-        pushbuttonThread = threading.Thread(target=pushbutton.run, args=())
-        pushbuttonThread.daemon = True
-        pushbuttonThread.start()
+        # Only do these if we are running Linux
+        if platform.system() == "Linux":
+          if data.config.screensaver_motionsensor:
+              motionsensor = Motion(data,matrix,sleepEvent,scheduler,screensaver)
+              motionsensorThread = threading.Thread(target=motionsensor.run, args=())
+              motionsensorThread.daemon = True
+              motionsensorThread.start()
+    if platform.system() == "Linux":
+      if data.config.pushbutton_enabled:
+          pushbutton = PushButton(data,matrix,sleepEvent)
+          pushbuttonThread = threading.Thread(target=pushbutton.run, args=())
+          pushbuttonThread.daemon = True
+          pushbuttonThread.start()
     
     mqtt_enabled = data.config.mqtt_enabled
     # Create a queue for scoreboard events and info to be sent to an MQTT broker

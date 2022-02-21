@@ -17,7 +17,7 @@ import platform
 uid = int(os.stat("./VERSION").st_uid)
 gid = int(os.stat("./VERSION").st_uid)
 
-# Removed as this will not run on a Mac
+# Removed as this will not run on a Mac or windows
 """ def stop_splash_service():
     sysbus = dbus.SystemBus()
     systemd1 = sysbus.get_object('org.freedesktop.systemd1',     '/org/freedesktop/systemd1')
