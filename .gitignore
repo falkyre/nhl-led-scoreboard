@@ -157,3 +157,6 @@ src/nhl_api_testing.py
 # board developement and testing folder
 src/renderer/boarddev
 
+emulator_config.json
+src/output/scoreboard.exe
+output/scoreboard.exe
