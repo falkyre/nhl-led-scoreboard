@@ -1,17 +1,18 @@
 from PIL import Image
 from utils import get_file
 from images.image_helper import ImageHelper
+from pyprojroot import here
 import os
 #import pwd
 #import grp
 import errno
 from utils import round_normal
 
-uid = int(os.stat("./VERSION").st_uid)
-gid = int(os.stat("./VERSION").st_uid)
+uid = int(os.stat(here("VERSION")).st_uid)
+gid = int(os.stat(here("VERSION")).st_uid)
 
 PATH = 'assets/logos'
-LOCAL_LOGO_URL = PATH+'/_local/{}_{}.svg'
+LOCAL_LOGO_URL = here(PATH+'/_local/{}_{}.svg')
 LOGO_URL = 'https://assets.nhle.com/logos/nhl/svg/{}_{}.svg'
 
 

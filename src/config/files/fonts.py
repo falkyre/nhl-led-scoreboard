@@ -1,11 +1,12 @@
 from config.file import ConfigFile
 from PIL import ImageFont
 from utils import get_file
+from pyprojroot import here
 
 class FontsConfig:
   def __init__(self, size):
-    self.config = ConfigFile('config/fonts/fonts.json')
-    self.dynamic_config = ConfigFile('config/fonts/fonts_{}x{}.json'.format(size[0], size[1]), size, False)
+    self.config = ConfigFile(here('config/fonts/fonts.json'))
+    self.dynamic_config = ConfigFile(here('config/fonts/fonts_{}x{}.json'.format(size[0], size[1])), size, False)
 
     self.config.combine(self.dynamic_config)
 
@@ -16,7 +17,7 @@ class FontsConfig:
 
     for element, value in self.config.data:
       self.fonts[element] = ImageFont.truetype(
-        get_file("assets/fonts/{}".format(value['file'])), 
+        get_file(here("assets/fonts/{}".format(value['file']))), 
         value['size']
       )
 

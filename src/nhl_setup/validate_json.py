@@ -4,7 +4,7 @@ import json
 
 def validateConf(confpath,schemapath):
 
-    # Validate a JSON config file (config.json) with JSON scema (config.schema.json).
+    # Validate a JSON config file (config.json) with JSON schema (config.schema.json).
     conf = {}
     schema = {}
     

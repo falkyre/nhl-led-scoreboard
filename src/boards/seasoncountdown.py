@@ -6,8 +6,10 @@ import datetime
 import debug
 from time import sleep
 from utils import get_file
+from pyprojroot import here
 
-PATH = 'assets/logos'
+
+PATH = here('assets/logos')
 LOGO_LINK = "https://www-league.nhlstatic.com/images/logos/league-dark/133-flat.svg"
 
 class SeasonCountdown:
@@ -44,7 +46,7 @@ class SeasonCountdown:
         #  it's just like Christmas!
         self.matrix.clear()
 
-        nhl_logo = Image.open(get_file('assets/logos/_local/nhl_logo_64x32.png'))
+        nhl_logo = Image.open(get_file(here('assets/logos/_local/nhl_logo_64x32.png')))
 
         self.matrix.draw_image((15,0), nhl_logo)
         
@@ -69,8 +71,8 @@ class SeasonCountdown:
         
         self.matrix.clear()
 
-        nhl_logo = Image.open(get_file('assets/logos/_local/nhl_logo_64x32.png'))
-        black_gradiant = Image.open(get_file('assets/images/64x32_scoreboard_center_gradient.png'))
+        nhl_logo = Image.open(get_file(here('assets/logos/_local/nhl_logo_64x32.png')))
+        black_gradiant = Image.open(get_file(here('assets/images/64x32_scoreboard_center_gradient.png')))
 
         self.matrix.draw_image((34,0), nhl_logo)
         self.matrix.draw_image((-5,0), black_gradiant)

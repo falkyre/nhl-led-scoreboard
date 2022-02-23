@@ -13,9 +13,10 @@ import geocoder
 import json
 from iso6709 import Location
 import platform
+from pyprojroot import here
 
-uid = int(os.stat("./VERSION").st_uid)
-gid = int(os.stat("./VERSION").st_uid)
+uid = int(os.stat(here("VERSION")).st_uid)
+gid = int(os.stat(here("VERSION")).st_uid)
 
 # Removed as this will not run on a Mac or windows
 """ def stop_splash_service():
@@ -39,7 +40,7 @@ def get_lat_lng(location):
     latlng = []
 
     j = {}
-    path = get_file("config/location.json")
+    path = get_file(here("config/location.json"))
     if os.path.isfile(path):
         try:
             j = json.load(open(path))

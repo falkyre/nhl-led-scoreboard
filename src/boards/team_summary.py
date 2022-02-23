@@ -11,6 +11,8 @@ from data.team import Team
 from time import sleep
 from utils import convert_date_format, get_file
 from renderer.logos import LogoRenderer
+from pyprojroot import here
+
 
 class TeamSummary:
     def __init__(self, data, matrix,sleepEvent):
@@ -97,11 +99,11 @@ class TeamSummary:
                     im_height
                 )
                 self.matrix.clear()
-                gradient = Image.open(get_file('assets/images/64x32_scoreboard_center_gradient.png'))
+                gradient = Image.open(get_file(here('assets/images/64x32_scoreboard_center_gradient.png')))
 
                 #   For 128x64 use the bigger gradient image.
                 if self.matrix.height == 64:
-                    gradient = Image.open(get_file('assets/images/128x64_scoreboard_center_gradient.png'))
+                    gradient = Image.open(get_file(here('assets/images/128x64_scoreboard_center_gradient.png')))
                 
                 
                 logo_renderer.render()

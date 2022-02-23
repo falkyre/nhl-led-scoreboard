@@ -6,6 +6,8 @@ import datetime
 import debug
 from time import sleep
 from utils import get_file
+from pyprojroot import here
+
 
 class Christmas:
     def __init__(self, data, matrix,sleepEvent):
@@ -80,7 +82,7 @@ class Christmas:
             
             xmas_scroll_text_width = xmas_scroll_text["size"][0] + 3
             
-            xmas_image = Image.open(get_file('assets/images/sleigh.png'))
+            xmas_image = Image.open(get_file(here('assets/images/sleigh.png')))
             self.matrix.draw_image((self.scroll_pos + xmas_scroll_text_width,4), xmas_image)
 
             xmas_content_width = xmas_scroll_text_width + 48
@@ -117,11 +119,11 @@ class Christmas:
         
         #choose one of three daily images to draw based on days to xmas and draw it
         if self.days_to_xmas % 3 == 0:
-            xmas_image = Image.open(get_file('assets/images/xmas_tree.png'))
+            xmas_image = Image.open(get_file(here('assets/images/xmas_tree.png')))
         elif self.days_to_xmas % 3 == 2:
-            xmas_image = Image.open(get_file('assets/images/candy_cane.png'))
+            xmas_image = Image.open(get_file(here('assets/images/candy_cane.png')))
         else:
-            xmas_image = Image.open(get_file('assets/images/gbread.png'))
+            xmas_image = Image.open(get_file(here('assets/images/gbread.png')))
 
         self.matrix.draw_image((36,1), xmas_image)
            

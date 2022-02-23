@@ -32,12 +32,20 @@ from renderer.loading_screen import Loading
 import debug
 import os
 import platform
+import traceback
+from rich.traceback import install
+
+install(show_locals=True)
+
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
 SCRIPT_VERSION = "1.6.7-emulator"
 
-
+def excepthook(exctype, value, tb):
+    with open("traceback.log", "w") as mylog:
+        traceback.print_exception(exctype, value, tb, file=mylog)
+        
 def run():
     # Kill the splash screen if active
     # stop_splash_service()
@@ -173,7 +181,11 @@ def run():
 
 if __name__ == "__main__":
     try:
+        #To dump traceback to log file
+        sys.excepthook = excepthook
+        
         run()
+        os.system("pause")
 
     except KeyboardInterrupt:
         print("Exiting NHL-LED-SCOREBOARD\n")

@@ -1,6 +1,8 @@
 from PIL import Image
 from utils import get_file
 import debug
+from pyprojroot import here
+
 
 class StanleyCupChampions:
     def __init__(self, data, matrix, sleepEvent):
@@ -22,7 +24,7 @@ class StanleyCupChampions:
         if self.team_id:
             print("Display stanley cup champions {} ".format(self.data.teams_info[self.team_id].abbreviation))
             self.matrix.clear()
-            bg_img = Image.open(get_file('assets/images/stanleycupchamps_bg.png'))
+            bg_img = Image.open(get_file(here('assets/images/stanleycupchamps_bg.png')))
             self.matrix.draw_image((0,0), bg_img)
 
             team_color_main = self.team_colors.color("{}.primary".format(self.team_id))

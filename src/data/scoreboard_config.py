@@ -5,6 +5,8 @@ from config.main import Config
 from nhl_setup.validate_json import validateConf
 import json
 import os
+import pathlib
+from pyprojroot import here
 import sys
 import debug
 
@@ -169,7 +171,14 @@ class ScoreboardConfig:
 
         j = {}
         msg = ""
-        path = get_file("config/{}".format(filename))
+        
+        # Create path based on __file__ location
+        # config_path = pathlib.Path(__file__).cwd() / "config/{}".format(filename)
+        config_path = here('./config/{}'.format(filename))
+        
+        #path = get_file("config/{}".format(filename))
+        path = get_file(config_path)
+        
         if os.path.isfile(path):
             try:
                 j = json.load(open(path))
@@ -199,8 +208,8 @@ class ScoreboardConfig:
             conffile = "config/config.json"
             schemafile = "config/config.schema.json"
 
-            confpath = get_file(conffile)
-            schemapath = get_file(schemafile)
+            confpath = get_file(here(conffile))
+            schemapath = get_file(here(schemafile))
             (valid,msg) = validateConf(confpath,schemapath)
             if valid:
                 debug.error("INFO: config.json passes validation")

@@ -1,12 +1,15 @@
 import math
 import csv
 import pathlib
+import debug
 
 def get_csv(csvfile):
     #Load csv to get data into a list
     #Make sure file exists
     the_list = []
     csv_path = pathlib.Path(__file__).parent / csvfile
+       
+    #debug.info("Loading wx icons from {}".format(csv_path))
     
     if csv_path.exists():
         the_list = list(csv.DictReader(open(csv_path,encoding="utf8")))

@@ -6,6 +6,8 @@ import debug
 from utils import center_text,get_file
 import glob
 import random
+from pyprojroot import here
+
 
 DISPLAY_DURATION = 5
 
@@ -28,7 +30,7 @@ class screenSaver:
 
         self.data.screensaver_displayed = True
         show_gif = self.data.config.screensaver_animations
-        all_gifs = glob.glob("assets/animations/screensaver/*.gif")
+        all_gifs = glob.glob(here("assets/animations/screensaver/*.gif"))
         if all_gifs and show_gif:
             filename = random.choice(all_gifs)
             debug.info("Screen saver animation is: " + filename)

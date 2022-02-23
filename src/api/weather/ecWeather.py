@@ -99,6 +99,9 @@ class ecWxWorker(object):
                 wx_temp = "N/A"
                 wx_app_temp = "N/A"
             
+            # Default to N/A for icon
+            wx_icon = '\uf07b'
+            
             try:
                 icon_code = curr_cond.get("icon_code").get("value","90")
             except:
@@ -187,6 +190,9 @@ class ecWxWorker(object):
             except:
                 wx_pressure = "N/A"
 
+            # Default for 
+            wx_tendency = '\uf07b'
+            
             try:
                 for row in range(len(self.icons)):
                     if self.icons[row]["Description"].lower() == curr_cond.get("tendency").get("value","N/A"):
