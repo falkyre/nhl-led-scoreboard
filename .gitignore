@@ -160,6 +160,5 @@ src/renderer/boarddev
 emulator_config.json
 src/output/scoreboard.exe
 output/scoreboard.exe
-auto-py-to-exe.json
 output/
 config/.default/firstrun

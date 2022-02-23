@@ -1,0 +1,101 @@
+{
+ "version": "auto-py-to-exe-configuration_v1",
+ "pyinstallerOptions": [
+  {
+   "optionDest": "noconfirm",
+   "value": true
+  },
+  {
+   "optionDest": "filenames",
+   "value": "C:/Users/sosterm1/Dev/nhl-led-scoreboard/src/main.py"
+  },
+  {
+   "optionDest": "onefile",
+   "value": false
+  },
+  {
+   "optionDest": "console",
+   "value": true
+  },
+  {
+   "optionDest": "icon_file",
+   "value": "C:/Users/sosterm1/Downloads/hockey-icon-21.ico"
+  },
+  {
+   "optionDest": "name",
+   "value": "scoreboard"
+  },
+  {
+   "optionDest": "ascii",
+   "value": false
+  },
+  {
+   "optionDest": "clean_build",
+   "value": true
+  },
+  {
+   "optionDest": "strip",
+   "value": false
+  },
+  {
+   "optionDest": "noupx",
+   "value": false
+  },
+  {
+   "optionDest": "disable_windowed_traceback",
+   "value": true
+  },
+  {
+   "optionDest": "embed_manifest",
+   "value": true
+  },
+  {
+   "optionDest": "uac_admin",
+   "value": false
+  },
+  {
+   "optionDest": "uac_uiaccess",
+   "value": false
+  },
+  {
+   "optionDest": "win_private_assemblies",
+   "value": false
+  },
+  {
+   "optionDest": "win_no_prefer_redirects",
+   "value": false
+  },
+  {
+   "optionDest": "bootloader_ignore_signals",
+   "value": false
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/tools/Anaconda3/envs/sean/RGBMatrixEmulator;RGBMatrixEmulator/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/sosterm1/Dev/nhl-led-scoreboard/assets;assets/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/sosterm1/Dev/nhl-led-scoreboard/config;config/"
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/sosterm1/Dev/nhl-led-scoreboard/VERSION;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/sosterm1/Dev/nhl-led-scoreboard/emulator_config.json;."
+  },
+  {
+   "optionDest": "datas",
+   "value": "C:/Users/sosterm1/utilities/GTK3-Runtime Win64/bin/libcairo-2.dll;."
+  }
+ ],
+ "nonPyinstallerOptions": {
+  "increaseRecursionLimit": true,
+  "manualArguments": ""
+ }
+}
