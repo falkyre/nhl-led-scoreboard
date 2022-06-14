@@ -27,6 +27,7 @@ TIMEOUT_TESTING = 0.001  # TO DELETE
 def get_schedule(year, month, day):
     try:
         data = requests.get(SCHEDULE_URL.format(year, month, day), timeout=REQUEST_TIMEOUT)
+        
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -34,6 +35,7 @@ def get_schedule(year, month, day):
 def get_teams():
     try:
         data = requests.get(TEAM_URL, timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -41,6 +43,7 @@ def get_teams():
 def get_player(playerId):
     try:
         data = requests.get(PLAYER_URL.format(BASE_URL, playerId), timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -49,6 +52,7 @@ def get_player(playerId):
 def get_overview(game_id):
     try:
         data = requests.get(OVERVIEW_URL.format(game_id), timeout=REQUEST_TIMEOUT)
+
         # data = dummie_overview()
         return data
     except requests.exceptions.RequestException as e:
@@ -58,6 +62,7 @@ def get_overview(game_id):
 def get_game_status():
     try:
         data = requests.get(STATUS_URL, timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -66,6 +71,7 @@ def get_game_status():
 def get_current_season():
     try:
         data = requests.get(CURRENT_SEASON_URL, timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -74,6 +80,7 @@ def get_current_season():
 def get_standings():
     try:
         data = requests.get(STANDINGS_URL, timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -81,6 +88,7 @@ def get_standings():
 def get_standings_wildcard():
     try:
         data = requests.get(STANDINGS_WILD_CARD, timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -88,6 +96,7 @@ def get_standings_wildcard():
 def get_playoff_data(season):
     try:
         data = requests.get(PLAYOFF_URL.format(season), timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)
@@ -95,6 +104,7 @@ def get_playoff_data(season):
 def get_series_record(seriesCode, season):
     try:
         data = requests.get(SERIES_RECORD.format(seriesCode, season), timeout=REQUEST_TIMEOUT)
+
         return data
     except requests.exceptions.RequestException as e:
         raise ValueError(e)

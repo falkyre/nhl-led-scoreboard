@@ -32,6 +32,7 @@ from renderer.loading_screen import Loading
 import debug
 import os
 
+
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
 SCRIPT_VERSION = "1.7.x.beta"
@@ -102,7 +103,7 @@ def run():
    
     #Create EC data feed handler
     if data.config.weather_enabled or data.config.wxalert_show_alerts:
-        if data.config.weather_data_feed.lower() == "ec" or data.config.wxalert_alert_feed.lower() == "ec":
+        if data.config.weather_data_feed.lower() == "ec" or (data.config.wxalert_show_alerts and data.config.wxalert_alert_feed.lower() == "ec"):
             try:              
                 data.ecData = ECWeather(coordinates=(tuple(data.latlng)))
                 asyncio.run(data.ecData.update())
@@ -165,10 +166,6 @@ def run():
         sbmqttThread.daemon = True
         sbmqttThread.start()
 
-    try:
-        result=1/0
-    except Exception as e:
-        debug.exception("Test Exception",e)
 
     MainRenderer(matrix, data, sleepEvent,sbQueue).render()
 

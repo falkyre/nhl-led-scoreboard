@@ -153,7 +153,7 @@ def get_default_value(def_config,def_key,def_type):
         if def_type == "bool":
             return True
         else:
-            return ""
+            return False
 
 def select_teams(qmark):
     team_select_answer = [

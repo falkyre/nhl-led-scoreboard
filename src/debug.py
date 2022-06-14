@@ -59,6 +59,12 @@ def log(text):
 		#__debugprint("DEBUG ({}): {}".format(__timestamp(), text))
 		logger.debug(text)
 
+def critical(text):
+	logger.critical(text,stack_info=True)
+
+def exception(text,e):
+  logger.exception(text,exc_info=e)
+
 def warning(text):
   #__debugprint("WARNING ({}): {}".format(__timestamp(), text))
   logger.warn(text)
