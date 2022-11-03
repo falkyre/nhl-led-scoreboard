@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "nhl-led-scoreboard"
+version = "1.7.0"
+description = "NHL LED Scoreboard with RGBMatrixEmulator"
+authors = ["Joel Joannisse <j.joannisse@gmail.com>","Sean Ostermann <falkyre@gmail.com>"]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+env-canada = "^0.5.25"
+ephem = "^4.1.3"
+cairosvg = "^2.5.2"
+fastjsonschema = "^2.16.2"
+geocoder = "^1.38.1"
+noaa-sdk = "^0.1.21"
+pyowm = "^3.3.0"
+regex = "^2022.10.31"
+apscheduler = "3.9.1"
+lastversion = "^2.4.5"
+nameparser = "^1.1.1"
+pillow = "^9.3.0"
+iso6709 = "^0.1.5"
+tk = "^0.1.0"
+rgbmatrixemulator = "^0.8.1"
+rich = "^12.6.0"
+paho-mqtt = "^1.6.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
