@@ -107,7 +107,8 @@ Activate your virtual environment
 source venv/bin/activate
 
 Install pip requirements using the emulator_requirements.txt:
-pip3 install -r emulator_requirements.txt
+
+>pip3 install -r emulator_requirements.txt
 
 Create your  config.json
 
