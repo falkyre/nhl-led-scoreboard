@@ -100,24 +100,24 @@ cd to where you cloned it and change to the emulator branch
 
 Create a virtual enviroment
 
-python3 -m venv venv
+>python3 -m venv venv
 
 Activate your virtual environment
 
-source venv/bin/activate
+>source venv/bin/activate
 
 Install pip requirements using the emulator_requirements.txt:
 
 >pip3 install -r emulator_requirements.txt
 
-Create your  config.json
+Create your config.json
 
 Run your scoreboard (from the root of where you cloned it).  No need for sudo as we don't need hardware access
 
-python3 src/main.py --emulated
+>python3 src/main.py --emulated
 
 This will start the browser adapter, go to http://<ip address of steamdeck>:8888 to see
 
-Stop the running scoreboard
+Stop the running scoreboard (CTRL-C)
 
 Edit the newley created emulator_config.json and change browser to pygame
