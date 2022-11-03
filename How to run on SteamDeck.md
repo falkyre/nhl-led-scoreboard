@@ -6,6 +6,8 @@
 
 Follow this guide https://github.com/89luca89/distrobox/blob/main/docs/posts/install_rootless.md
 
+Pay attention to Step 3 specifically as you may need to forward your xhost so the GUI shows up.
+
 Once distrobox is installed, you need to create your first distro.
 
 <h2>Create a debian distro</h2>
