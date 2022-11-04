@@ -112,7 +112,9 @@ Install pip requirements using the emulator_requirements.txt:
 
 >pip3 install -r emulator_requirements.txt
 
-Create your config.json
+<h2>Create your config.json</h2>
+    cd config
+    cp config.json.sample config.json
 
 Run your scoreboard (from the root of where you cloned it).  No need for sudo as we don't need hardware access
 
