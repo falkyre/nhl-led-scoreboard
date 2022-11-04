@@ -25,7 +25,7 @@ Once distrobox is installed, you need to create your first distro.
     Writing manifest to image destination
     Storing signatures
     2110dbbc33d288a81b2c6f8658130f7c6dc46704d32eb13bb5b30f6e24ee6125
-                                                                    16:57:46
+
     Image debian not found.
     Do you want to pull the image now? [Y/n]: y
     ✔ docker.io/library/debian:latest
