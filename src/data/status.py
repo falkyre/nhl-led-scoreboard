@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from nhl_api import game_status_info, current_season_info, next_season_info
+from nhl_api import current_season_info, next_season_info
 import debug
 
 class Status:
@@ -27,7 +27,6 @@ class Status:
                     self.GameOver.append(status['detailedState'])
                 else:
                     self.Final.append(status['detailedState'])
-        
         # # Make sure that the next_season_info is not an empty list, if it is, make next_season = to current season
         
         # if not self.next_season_info:
@@ -59,7 +58,7 @@ class Status:
             regular_season_startdate = datetime.strptime(self.season_info['regularSeasonStartDate'], "%Y-%m-%d").date()
             end_of_season = datetime.strptime(self.season_info['seasonEndDate'], "%Y-%m-%d").date()
             return date < regular_season_startdate or date > end_of_season
-        except:
+        except Exception:
             debug.error('The Argument provided for status.is_offseason is missing or not right.')
             return False
 
@@ -75,7 +74,7 @@ class Status:
             return False
      
     def refresh_next_season(self):
-        debug.info(f"Updating next season info")
+        debug.info("Updating next season info")
         self.season_info = current_season_info()[-1]
         self.next_season_info = next_season_info().json()
         # debug.info(f"{self.next_season_info['regularSeasonStartDate']}")
