@@ -157,7 +157,11 @@ class ScoreboardConfig:
         self.standing_type = json["boards"]["standings"]["standing_type"]
         self.preferred_divisions = json["boards"]["standings"]["divisions"]
         self.preferred_conference = json["boards"]["standings"]["conference"]
-        #self.wildcard_limit = json["boards"]["standings"]["wildcard_limit"]
+        
+        try:
+            self.wildcard_limit = json["boards"]["standings"]["wildcard_limit"]
+        except KeyError:
+            self.wildcard_limit = 4
 
         # Player Stats
         try:
