@@ -22,7 +22,12 @@ class Standings:
         self.team_colors = data.config.team_colors
         self.sleepEvent= sleepEvent
         self.sleepEvent.clear()
+<<<<<<< HEAD
         self.wildcard_limit = data.config.wildcard_limit
+=======
+        #wildcard broken
+        #self.wildcard_limit = self.data.config.wildcard_limit
+>>>>>>> 99a289b3c983d37295ed59cbb7f3861840dd1c02
 
     def render(self):
         if self.data.standings:
