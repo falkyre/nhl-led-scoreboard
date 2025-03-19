@@ -29,7 +29,7 @@ install(show_locals=True)
 
 SCRIPT_NAME = "NHL-LED-SCOREBOARD"
 
-SCRIPT_VERSION = "2025.2.0"
+SCRIPT_VERSION = "2025.3.0"
 
 # Conditionally load the appropriate driver classes and set the global driver mode based on command line flags
 
