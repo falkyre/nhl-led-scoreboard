@@ -235,7 +235,7 @@ def args():
     parser.add_argument("--logtofile", action="store_true", help="Generate scoreboard.log file to be used with scripts/sbtools/issueUpload.sh", default=False)
     
     parser.add_argument("--nhl-timeout", action="store", help="timeout for calls to the NHL API, defaults to 10 seconds", default=10, type=int)
-    parser.add_argument("--nhl-ssl-verify", action="store_true", help="Disable SSL certificate verification for NHL API calls", default=False)
+    parser.add_argument("--nhl-no-ssl-verify", action="store_true", help="Disable SSL certificate verification for NHL API calls (not recommended)", default=False)
 
     return parser.parse_args()
 

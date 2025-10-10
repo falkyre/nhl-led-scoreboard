@@ -42,7 +42,11 @@ except metadata.PackageNotFoundError:
         SCRIPT_VERSION = f.read().strip()
 
 # Initialize the logger with default settings
-debug.setup_logger(logtofile=args().logtofile)
+# If loglevel is provided on command line, use it from the start
+if args().loglevel:
+    debug.setup_logger(loglevel=args().loglevel, debug=(args().loglevel.lower() == 'debug'), logtofile=args().logtofile)
+else:
+    debug.setup_logger(logtofile=args().logtofile)
 sb_logger = logging.getLogger("scoreboard")
 
 # Conditionally load the appropriate driver classes and set the global driver mode based on command line flags

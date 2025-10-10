@@ -1,6 +1,7 @@
 """Module that is used for holding basic objects"""
 import json
 
+
 class Object(object):
     def __init__(self, d):
         if type(d) is str:

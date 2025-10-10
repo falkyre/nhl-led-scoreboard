@@ -1,6 +1,4 @@
 from datetime import datetime, timezone
-import nhl_api.object
-import json
 
 
 def convert_time(utc_dt):
