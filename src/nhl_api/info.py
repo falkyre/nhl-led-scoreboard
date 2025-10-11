@@ -1,3 +1,22 @@
+"""
+DEPRECATION NOTICE:
+    Many classes and functions in this module are candidates for deprecation
+    in favor of the new structured dataclasses in src/nhl_api/models.py.
+
+    Still actively used by core application:
+    - team_info() - Used to get all team information
+    - standings() - Wrapper that returns Standings object
+    - playoff_info() - Returns playoff bracket structure
+
+    Deprecation candidates (replace with models.py):
+    - Standings class -> Use Standings dataclass from models.py
+    - Conference class -> Use Conference dataclass from models.py
+    - Division class -> Use Division dataclass from models.py
+    - Playoff class -> Consider creating Playoff dataclass in models.py
+    - player_info() using MultiLevelObject -> Use Player dataclass from models.py
+
+    See TODO.md for migration strategy.
+"""
 import json
 import logging
 

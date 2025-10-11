@@ -1,4 +1,18 @@
-"""Module that is used for holding basic objects"""
+"""
+Module that is used for holding basic objects
+
+DEPRECATION NOTICE:
+    These classes are candidates for deprecation in favor of the new
+    structured dataclasses in src/nhl_api/models.py.
+
+    Current usage:
+    - MultiLevelObject: Used by info.py for player_info()
+    - Object: Base class for MultiLevelObject
+
+    Migration path:
+    - Replace with Player dataclass from models.py
+    - See TODO.md for migration strategy
+"""
 import json
 
 

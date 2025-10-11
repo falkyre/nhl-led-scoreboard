@@ -1,3 +1,18 @@
+"""
+DEPRECATION NOTICE:
+    This PlayerStats class is a candidate for deprecation in favor of the new
+    Player and PlayerStats dataclasses in src/nhl_api/models.py.
+
+    Current usage:
+    - boards/ovi_tracker.py
+    - boards/player_stats.py
+    - nhl_api/data.py (get_player_stats function)
+
+    Migration path:
+    - Use Player dataclass from models.py instead
+    - client.get_player_structured(player_id) returns structured Player object
+    - See TODO.md for migration strategy
+"""
 
 class PlayerStats:
     """Class to handle NHL API player statistics"""
