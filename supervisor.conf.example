@@ -28,7 +28,7 @@
 # Command to run - runs as root (required for LED matrix hardware access)
 # Adjust the matrix settings (--led-*) to match your hardware configuration
 # Update /home/rpi/ paths if you installed to a different directory
-command=PYTHONDONTWRITEBYTECODE=1 /home/rpi/nhlsb-venv/bin/python3 ./src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-brightness=60 --led-slowdown-gpio=3 --led-rgb-sequence=rgb --led-rows=64 --led-cols=128 --led-pwm-bits=10 --led-limit-refresh=120 --led-pwm-dither-bits=1
+command=/home/rpi/nhlsb-venv/bin/python3 ./src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-brightness=60 --led-slowdown-gpio=3 --led-rgb-sequence=rgb --led-rows=64 --led-cols=128 --led-pwm-bits=10 --led-limit-refresh=120 --led-pwm-dither-bits=1
 
 # Working directory - update if you installed elsewhere
 directory=/home/rpi/nhl-led-scoreboard
@@ -47,9 +47,9 @@ autorestart=true
 startretries=3
 startsecs=5
 
-# Environment variables (optional - we're passing PYTHONDONTWRITEBYTECODE directly to sudo)
-# Setting it here as well provides defense-in-depth in case sudo strips it
-# You can also add other environment variables here if needed
+# Environment variables
+# IMPORTANT: PYTHONDONTWRITEBYTECODE=1 prevents Python from creating __pycache__ files
+# with root permissions, which would cause permission issues for plugins.py and other tools
 environment=PYTHONDONTWRITEBYTECODE="1"
 
 # Logging configuration
@@ -69,8 +69,7 @@ stopsignal=TERM
 
 # Notes:
 # - Process runs as root (no user= directive, inherits from supervisord)
-# - PYTHONDONTWRITEBYTECODE=1 prevents creating root-owned cache files
-# - The environment= setting provides defense-in-depth
+# - PYTHONDONTWRITEBYTECODE=1 is set via environment= directive (not in command line)
+# - Root privileges are required for direct GPIO access to LED matrix hardware
 # - Adjust all paths if you installed to a different directory
 # - Adjust LED matrix parameters (--led-*) to match your specific hardware
-# - Root privileges are required for direct GPIO access to LED matrix hardware
