@@ -36,43 +36,47 @@ BEFORE_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' 
 
 if [ "$BEFORE_COUNT" -eq 0 ]; then
     echo "${GREEN}✓ No __pycache__ directories found. Nothing to clean.${RESET}"
-    exit 0
-fi
+    # Don't exit yet - might need to configure environment
+    FINAL_COUNT=0
+    REMOVED=0
+else
+    echo "${YELLOW}Found ${BEFORE_COUNT} __pycache__ director(y/ies)${RESET}"
 
-echo "${YELLOW}Found ${BEFORE_COUNT} __pycache__ director(y/ies)${RESET}"
+    # Try to remove without sudo first
+    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
 
-# Try to remove without sudo first
-find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+    # Check if any remain (would need sudo to remove)
+    AFTER_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
 
-# Check if any remain (would need sudo to remove)
-AFTER_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$AFTER_COUNT" -gt 0 ]; then
+        echo "${YELLOW}Some cache directories require elevated permissions...${RESET}"
 
-if [ "$AFTER_COUNT" -gt 0 ]; then
-    echo "${YELLOW}Some cache directories require elevated permissions...${RESET}"
-
-    # Check if we can use sudo
-    if sudo -n true 2>/dev/null; then
-        # Already have sudo privileges, just use them
-        sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
-        AFTER_COUNT=0
-    else
-        # Need to ask for sudo
-        echo "${YELLOW}This script needs sudo to remove cache files created by root.${RESET}"
-        if sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; then
+        # Check if we can use sudo
+        if sudo -n true 2>/dev/null; then
+            # Already have sudo privileges, just use them
+            sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
             AFTER_COUNT=0
         else
-            echo "${RED}✗ Failed to remove some cache directories${RESET}"
-            exit 1
+            # Need to ask for sudo
+            echo "${YELLOW}This script needs sudo to remove cache files created by root.${RESET}"
+            if sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; then
+                AFTER_COUNT=0
+            else
+                echo "${RED}✗ Failed to remove some cache directories${RESET}"
+                exit 1
+            fi
         fi
     fi
+
+    # Final check
+    FINAL_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
+    REMOVED=$((BEFORE_COUNT - FINAL_COUNT))
 fi
 
-# Final check
-FINAL_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
-
 if [ "$FINAL_COUNT" -eq 0 ]; then
-    REMOVED=$((BEFORE_COUNT - FINAL_COUNT))
-    echo "${GREEN}✓ Successfully removed ${REMOVED} __pycache__ director(y/ies)${RESET}"
+    if [ "$REMOVED" -gt 0 ]; then
+        echo "${GREEN}✓ Successfully removed ${REMOVED} __pycache__ director(y/ies)${RESET}"
+    fi
     echo ""
 
     # Configure environment to prevent future issues if --configure flag was passed
