@@ -87,6 +87,9 @@ if $(dpkg --compare-versions $(py_ver) "gt" "3.10.0"); then
 
   echo "export VIRTUAL_ENV=~/nhlsb-venv" >> .envrc
   echo "source ~/nhlsb-venv/bin/activate" >> .envrc
+  # Prevent Python from writing __pycache__ files which would have root permissions
+  # when the app runs with sudo (required for LED matrix hardware access)
+  echo "export PYTHONDONTWRITEBYTECODE=1" >> .envrc
   direnv allow .
   if ! grep -q sb-init ~/.bashrc; then
   # Update bashrc
@@ -99,6 +102,10 @@ show_virtual_env() {
 }
 export -f show_virtual_env
 PS1='$(show_virtual_env)'$PS1
+
+# Prevent Python from writing __pycache__ files which would have root permissions
+# when the app runs with sudo (required for LED matrix hardware access)
+export PYTHONDONTWRITEBYTECODE=1
 
 export DIRENV_LOG_FORMAT=
 eval "$(direnv hook bash)"
@@ -199,6 +206,9 @@ git config pull.rebase false
 git reset --hard
 git fetch origin --prune
 git pull
+
+# Clean up any existing __pycache__ directories that may have root permissions
+$DIR/sb-cleanup-cache
 
 # Install nhl_setup binary based on architecture
 tput bold; echo "$(tput setaf 2)Installing nhl_setup binary...$(tput setaf 9)" ; tput sgr0

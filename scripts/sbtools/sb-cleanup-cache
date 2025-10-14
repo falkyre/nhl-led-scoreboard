@@ -1,0 +1,139 @@
+#!/bin/bash
+# NHL LED Scoreboard - Cleanup Python cache files
+#
+# This script removes all __pycache__ directories that may have been created
+# with root permissions when running the scoreboard with sudo.
+#
+# This is safe to run at any time and is automatically called during:
+# - Installation (sb-init)
+# - Updates (sb-upgrade)
+#
+# Usage:
+#   ./scripts/sbtools/sb-cleanup-cache              # Just cleanup cache files
+#   ./scripts/sbtools/sb-cleanup-cache --configure  # Cleanup + prevent future issues
+
+# Make script work regardless of where it is run from
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "${DIR}/../.." || exit 1
+
+# Parse command line arguments
+CONFIGURE=false
+if [ "$1" = "--configure" ] || [ "$1" = "-c" ]; then
+    CONFIGURE=true
+fi
+
+# Colors for output
+RED=$(tput setaf 1 2>/dev/null)
+GREEN=$(tput setaf 2 2>/dev/null)
+YELLOW=$(tput setaf 3 2>/dev/null)
+BOLD=$(tput bold 2>/dev/null)
+RESET=$(tput sgr0 2>/dev/null)
+
+echo "${BOLD}${GREEN}Cleaning up Python cache files...${RESET}"
+
+# Count how many __pycache__ directories exist before cleanup
+BEFORE_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$BEFORE_COUNT" -eq 0 ]; then
+    echo "${GREEN}✓ No __pycache__ directories found. Nothing to clean.${RESET}"
+    exit 0
+fi
+
+echo "${YELLOW}Found ${BEFORE_COUNT} __pycache__ director(y/ies)${RESET}"
+
+# Try to remove without sudo first
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+
+# Check if any remain (would need sudo to remove)
+AFTER_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$AFTER_COUNT" -gt 0 ]; then
+    echo "${YELLOW}Some cache directories require elevated permissions...${RESET}"
+
+    # Check if we can use sudo
+    if sudo -n true 2>/dev/null; then
+        # Already have sudo privileges, just use them
+        sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+        AFTER_COUNT=0
+    else
+        # Need to ask for sudo
+        echo "${YELLOW}This script needs sudo to remove cache files created by root.${RESET}"
+        if sudo find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; then
+            AFTER_COUNT=0
+        else
+            echo "${RED}✗ Failed to remove some cache directories${RESET}"
+            exit 1
+        fi
+    fi
+fi
+
+# Final check
+FINAL_COUNT=$(find . -type d -name "__pycache__" 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$FINAL_COUNT" -eq 0 ]; then
+    REMOVED=$((BEFORE_COUNT - FINAL_COUNT))
+    echo "${GREEN}✓ Successfully removed ${REMOVED} __pycache__ director(y/ies)${RESET}"
+    echo ""
+
+    # Configure environment to prevent future issues if --configure flag was passed
+    if [ "$CONFIGURE" = true ]; then
+        echo "${BOLD}${GREEN}Configuring environment to prevent future cache issues...${RESET}"
+
+        CHANGES_MADE=false
+
+        # Add to .envrc if it exists and doesn't already have the setting
+        if [ -f .envrc ]; then
+            if ! grep -q "PYTHONDONTWRITEBYTECODE" .envrc; then
+                echo "export PYTHONDONTWRITEBYTECODE=1" >> .envrc
+                echo "${GREEN}✓ Added PYTHONDONTWRITEBYTECODE to .envrc${RESET}"
+
+                # Try to reload direnv if available
+                if command -v direnv &> /dev/null; then
+                    direnv allow . 2>/dev/null
+                fi
+                CHANGES_MADE=true
+            else
+                echo "${YELLOW}  .envrc already configured${RESET}"
+            fi
+        else
+            echo "${YELLOW}  .envrc not found (will be created during installation)${RESET}"
+        fi
+
+        # Add to .bashrc if it doesn't already have the setting
+        if [ -f ~/.bashrc ]; then
+            if ! grep -q "PYTHONDONTWRITEBYTECODE" ~/.bashrc; then
+                echo "" >> ~/.bashrc
+                echo "# Prevent Python cache files with root permissions (NHL LED Scoreboard)" >> ~/.bashrc
+                echo "export PYTHONDONTWRITEBYTECODE=1" >> ~/.bashrc
+                echo "${GREEN}✓ Added PYTHONDONTWRITEBYTECODE to ~/.bashrc${RESET}"
+                CHANGES_MADE=true
+            else
+                echo "${YELLOW}  ~/.bashrc already configured${RESET}"
+            fi
+        fi
+
+        if [ "$CHANGES_MADE" = true ]; then
+            echo ""
+            echo "${GREEN}Configuration complete! Run this to apply changes to current shell:${RESET}"
+            echo "  ${YELLOW}export PYTHONDONTWRITEBYTECODE=1${RESET}"
+            echo ""
+            echo "${GREEN}Or start a new terminal session.${RESET}"
+        else
+            echo ""
+            echo "${GREEN}Environment already configured correctly!${RESET}"
+        fi
+    else
+        # Show helpful message about --configure flag
+        echo "${GREEN}To prevent future cache file issues, run:${RESET}"
+        echo "  ${YELLOW}$0 --configure${RESET}"
+        echo ""
+        echo "${GREEN}Or manually ensure PYTHONDONTWRITEBYTECODE=1 is set:${RESET}"
+        echo "  - Check .envrc: ${YELLOW}grep PYTHONDONTWRITEBYTECODE .envrc${RESET}"
+        echo "  - Check .bashrc: ${YELLOW}grep PYTHONDONTWRITEBYTECODE ~/.bashrc${RESET}"
+    fi
+
+    exit 0
+else
+    echo "${RED}✗ Warning: ${FINAL_COUNT} __pycache__ director(y/ies) could not be removed${RESET}"
+    exit 1
+fi

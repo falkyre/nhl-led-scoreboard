@@ -82,6 +82,16 @@ if git pull --rebase --stat origin main; then
     # Save the commit prior to updating
     git config nhl-led-scoreboard.lastVersion "$last_commit"
 
+    # Clean up any existing __pycache__ directories that may have root permissions
+    $DIR/sb-cleanup-cache
+
+    # Add PYTHONDONTWRITEBYTECODE to .envrc if not already present (for upgrades from older versions)
+    if [ -f ../../.envrc ] && ! grep -q "PYTHONDONTWRITEBYTECODE" ../../.envrc; then
+      printf "${GREEN}%s${RESET}\n" "Adding PYTHONDONTWRITEBYTECODE to .envrc..."
+      echo "export PYTHONDONTWRITEBYTECODE=1" >> ../../.envrc
+      direnv allow ../../
+    fi
+
     # Display changelog with less if available, otherwise just print it to the terminal
     if [[ $ret -eq 0 ]]; then
       #"/home/pi/sbtools/changelog.sh" HEAD "$last_commit"
