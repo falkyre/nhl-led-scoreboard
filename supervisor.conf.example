@@ -1,0 +1,76 @@
+# NHL LED Scoreboard - Supervisor Configuration Example
+#
+# This file provides an example configuration for running the NHL LED Scoreboard
+# as a system service using Supervisor.
+#
+# ============================================================================
+# IMPORTANT: Search and replace 'rpi' with your actual username throughout
+#            this file if different (typically 'pi' on Raspberry Pi OS)
+# ============================================================================
+#
+# Installation:
+#   1. Install supervisor: sudo apt-get install supervisor
+#   2. Copy this file: sudo cp supervisor.conf.example /etc/supervisor/conf.d/nhl-scoreboard.conf
+#   3. Edit the configuration to match your setup:
+#      - Replace 'rpi' with your username (appears in 3 places: command, directory, user)
+#      - Adjust matrix settings (--led-*) to match your hardware
+#   4. Reload supervisor: sudo supervisorctl reread && sudo supervisorctl update
+#   5. Start the service: sudo supervisorctl start scoreboard
+#
+# Management commands:
+#   sudo supervisorctl status scoreboard      # Check status
+#   sudo supervisorctl start scoreboard       # Start service
+#   sudo supervisorctl stop scoreboard        # Stop service
+#   sudo supervisorctl restart scoreboard     # Restart service
+#   sudo supervisorctl tail scoreboard        # View logs
+
+[program:scoreboard]
+# Command to run
+# NOTE: If your username is not 'rpi', change /home/rpi/nhlsb-venv to /home/YOUR_USERNAME/nhlsb-venv
+# Adjust the matrix settings (--led-*) to match your hardware configuration
+command=sudo PYTHONDONTWRITEBYTECODE=1 /home/rpi/nhlsb-venv/bin/python3 ./src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-brightness=60 --led-slowdown-gpio=3 --led-rgb-sequence=rgb --led-rows=64 --led-cols=128 --led-pwm-bits=10 --led-limit-refresh=120 --led-pwm-dither-bits=1
+
+# Working directory
+# NOTE: Change 'rpi' to your username if different
+directory=/home/rpi/nhl-led-scoreboard
+
+# User to run as (change 'rpi' to your username if different - typically 'pi' on Raspberry Pi OS)
+# Note: The command uses 'sudo' to gain root privileges needed for LED matrix hardware access
+user=rpi
+
+# Auto-start on system boot
+autostart=true
+
+# Auto-restart if process crashes
+autorestart=true
+
+# Don't restart too quickly if it keeps failing
+startretries=3
+startsecs=5
+
+# Environment variables (optional - we're passing PYTHONDONTWRITEBYTECODE directly to sudo)
+# Setting it here as well provides defense-in-depth in case sudo strips it
+# You can also add other environment variables here if needed
+environment=PYTHONDONTWRITEBYTECODE="1"
+
+# Logging configuration
+stdout_logfile=/var/log/supervisor/nhl-scoreboard.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile=/var/log/supervisor/nhl-scoreboard-error.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+
+# Process priority (lower number = higher priority)
+priority=999
+
+# Kill process gracefully (SIGTERM) before forcing (SIGKILL)
+stopwaitsecs=10
+stopsignal=TERM
+
+# Notes:
+# - We pass PYTHONDONTWRITEBYTECODE=1 directly in the sudo command for clarity and security
+# - The environment= setting provides defense-in-depth in case sudo strips variables
+# - Alternative approach: Use 'sudo -E' to preserve ALL environment variables (less secure)
+# - Adjust all paths if you installed to a different directory or user
+# - Adjust LED matrix parameters (--led-*) to match your specific hardware
