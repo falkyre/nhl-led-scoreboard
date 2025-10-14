@@ -8,4 +8,11 @@ cd "${DIR}/.."
 # when running with sudo (required for LED matrix hardware access)
 export PYTHONDONTWRITEBYTECODE=1
 
-sudo -E python3 src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-slowdown-gpio=3
+# Check for venv Python
+if [ ! -f "$HOME/nhlsb-venv/bin/python3" ]; then
+    echo "Error: Virtual environment not found at $HOME/nhlsb-venv"
+    echo "Please run the installation script first: ./scripts/sbtools/sb-init"
+    exit 1
+fi
+
+sudo -E "$HOME/nhlsb-venv/bin/python3" src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-slowdown-gpio=3
