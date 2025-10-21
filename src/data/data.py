@@ -6,7 +6,9 @@
 from datetime import datetime, date, timedelta
 from time import sleep
 import logging
-import nhl_api
+from nhl_api import info as nhl_info
+from nhl_api.data import get_score_details, get_game_overview, get_standings, get_playoff_data
+from nhl_api.player import PlayerStats
 from data.playoffs import Series
 from data.status import Status
 from utils import get_lat_lng
@@ -259,7 +261,7 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                teams = nhl_api.info.team_info()
+                teams = nhl_info.team_info()
                 self.network_issues = False
                 return teams
 
@@ -294,7 +296,8 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                data = nhl_api.data.get_score_details("{}-{}-{}".format(str(self.year), str(self.month).zfill(2), str(self.day).zfill(2)))
+                date_obj = date(self.year, self.month, self.day)
+                data = get_score_details(date_obj)
                 if not data:
                     self.games = []
                     self.pref_games = []
@@ -309,7 +312,7 @@ class Data:
                 for team_id in self.pref_teams:
                     #import pdb; pdb.set_trace()
                     team_info = self.teams_info[team_id].details
-                    pg, ng = nhl_api.info.team_previous_game(team_info.abbrev, str(date.today()))
+                    pg, ng = nhl_info.team_previous_game(team_info.abbrev, str(date.today()))
                     team_info.previous_game = pg
                     team_info.next_game = ng
 
@@ -427,7 +430,7 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                self.overview = nhl_api.overview(self.current_game_id)
+                self.overview = get_game_overview(self.current_game_id)
                 # TODO: Not sure what was going on here
                 if self.time_stamp != self.overview["clock"]["timeRemaining"]:
                     self.time_stamp = self.overview["clock"]["timeRemaining"]
@@ -481,7 +484,7 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                self.standings = nhl_api.standings()
+                self.standings = nhl_info.standings()
                 break
 
             except ValueError as error_message:
@@ -518,7 +521,7 @@ class Data:
 
     #Players
     def get_players_info(self, playerId):
-        self.players_info = nhl_api.info.player_info(playerId)
+        self.players_info = nhl_info.player_info(playerId)
 
     #
     # Playoffs
@@ -536,7 +539,7 @@ class Data:
         while attempts_remaining > 0:
             try:
                 # Get the plaoffs data from the nhl api
-                self.playoffs = nhl_api.playoff(self.status.season_id)
+                self.playoffs = nhl_info.Playoff(nhl_info.playoff_info(self.status.season_id))
                 # Check if there is any rounds avaialable and grab the most recent one available.
                 if self.playoffs.rounds:
                     self.current_round = self.playoffs.rounds[str(self.playoffs.default_round)]
@@ -662,7 +665,7 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                player_stats = nhl_api.info.PlayerStats(player_id, season)
+                player_stats = PlayerStats(player_id, season)
                 self.network_issues = False
                 return player_stats
             except ValueError as error_message:

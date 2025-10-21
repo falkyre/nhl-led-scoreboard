@@ -1,7 +1,7 @@
 from data.team import SeriesTeam
 from data.scoreboard import Scoreboard
 from utils import convert_time
-from nhlpy import NHLClient
+from nhl_api.nhl_client import client
 import logging
 from datetime import datetime, timedelta
 
@@ -37,8 +37,7 @@ class Series:
             This is off from the nhl record api. Not sure if it will update as soon as the day is over. 
         """
         try:
-            client = NHLClient(verbose=False)
-            series_info = client.playoffs.schedule(data.status.season_id, series["seriesLetter"])
+            series_info = client.get_series_record(series["seriesLetter"], data.status.season_id)
         except Exception as e:
             debug.error(f"Failed to get series info for {series['seriesLetter']}")
             return
@@ -95,9 +94,8 @@ class Series:
         else:
             # Not cached, request the overview from the NHL API
             try:
-                debug.debug(f"Cache miss, requesting overview for game {gameid}") 
-                client = NHLClient(verbose=False)
-                overview = client.game_center.play_by_play(gameid)
+                debug.debug(f"Cache miss, requesting overview for game {gameid}")
+                overview = client.get_game_overview(gameid)
             except:
                 debug.error("failed overview refresh for series game id {}".format(gameid))
 
