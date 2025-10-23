@@ -3,16 +3,17 @@
         single one.
 """
 
-from datetime import datetime, date, timedelta
-from time import sleep
+import json
 import logging
-from nhl_api import info as nhl_info
-from nhl_api.data import get_score_details, get_game_overview, get_standings, get_playoff_data
-from nhl_api.player import PlayerStats
+from datetime import date, datetime, timedelta
+from time import sleep
+
 from data.playoffs import Series
 from data.status import Status
+from nhl_api import info as nhl_info
+from nhl_api.data import get_game, get_game_overview, get_playoff_data, get_score_details, get_standings
+from nhl_api.player import PlayerStats
 from utils import get_lat_lng
-import json
 
 NETWORK_RETRY_SLEEP_TIME = 0.5
 
@@ -371,7 +372,8 @@ class Data:
         #        earliest_start_time = datetime.strptime(g["startTimeUTC"], '%Y-%m-%dT%H:%M:%SZ')
         debug.info('checking highest priority game')
         for g in self.pref_games:
-            if not self.status.is_final(g["gameState"]) and not g["gameState"]=="OFF":
+            game_obj = get_game(g["id"])
+            if not game_obj.is_final:
                 # If the game started.
                 if datetime.strptime(g["startTimeUTC"],'%Y-%m-%dT%H:%M:%SZ') <= datetime.utcnow():
                     debug.info('Showing highest priority live game. {} vs {}'.format(g["awayTeam"]["name"]["default"], g["homeTeam"]["name"]["default"]))

@@ -1,5 +1,28 @@
 # NHL API Normalization - Status Report
 
+## Quick Summary
+
+**Goal:** Create a consistent, type-safe NHL API interface.
+
+**Current Status:** Phase 1 Complete - Foundation ready, backward compatible.
+
+**Naming Convention Note:** The new functions have **intentionally inconsistent naming** as a temporary compromise:
+
+- `get_games()` and `get_game()` - clean names (no conflicts with existing functions)
+- `get_player_structured()` and `get_standings_structured()` - have `_structured` suffix (to avoid conflicts with existing `get_player()` and `get_standings()` that return dicts)
+
+**This is temporary!** After migration (Phase 4), all functions will have clean, consistent names without suffixes.
+
+### Function Evolution Table
+
+| Phase | Games | Game | Player | Standings |
+|-------|-------|------|--------|-----------|
+| **Legacy (before)** | `get_score_details()` → Dict | `get_game_overview()` → Dict | `get_player()` → Dict | `get_standings()` → Dict |
+| **Phase 1 (now)** | `get_games()` → List[Game] | `get_game()` → Game | `get_player_structured()` → Player | `get_standings_structured()` → Standings |
+| **Phase 4 (goal)** | `get_games()` → List[Game] | `get_game()` → Game | `get_player()` → Player | `get_standings()` → Standings |
+
+---
+
 ## Completed Work
 
 ### 1. Legacy API Removal ✅
@@ -106,6 +129,41 @@ All models are well-designed dataclasses with:
 - `Standings` - Complete standings with conference/division organization
 - `Score`, `TeamRecord`, `GamePeriod` - Supporting models
 
+### Naming Convention Note
+
+**Current State (Intentionally Inconsistent):**
+```python
+get_games(date_obj)                # Returns List[Game] - no suffix
+get_game(game_id)                  # Returns Game - no suffix
+get_player_structured(player_id)   # Returns Player - HAS suffix
+get_standings_structured()         # Returns Standings - HAS suffix
+```
+
+**Why the inconsistency?**
+
+This is a **temporary, pragmatic compromise** to enable gradual migration without breaking changes:
+
+- `get_games()` and `get_game()` use clean names because there were **no existing functions** with those names
+- `get_player_structured()` and `get_standings_structured()` use the `_structured` suffix because **legacy functions already exist** with the base names (`get_player()`, `get_standings()`) that return raw dicts
+
+**The `_structured` suffix serves as a temporary marker** indicating "this is the modern, type-safe version" while the legacy version still exists.
+
+**End Goal (After Migration):**
+```python
+# Perfect consistency - all clean names, all return structured objects
+get_games(date_obj) -> List[Game]
+get_game(game_id) -> Game
+get_player(player_id) -> Player      # Suffix removed
+get_standings() -> Standings          # Suffix removed
+```
+
+This will be achieved by:
+
+1. Migrating application code to use structured functions
+2. Removing legacy functions that return dicts
+3. Renaming `get_player_structured()` → `get_player()`
+4. Renaming `get_standings_structured()` → `get_standings()`
+
 ---
 
 ## Consistency Analysis
@@ -171,18 +229,55 @@ for game in games:
 - [x] Create migration guide documentation
 - [x] No breaking changes
 
-### Phase 2: Gradual Migration (🔄 Ready)
-**Ready for implementation:**
-- [ ] Migrate `src/data/data.py` to use normalized functions
-- [ ] Migrate `src/data/playoffs.py` to use structured objects
-- [ ] Migrate board modules (`stats_leaders.py`, `player_stats.py`, etc.)
-- [ ] Test each module after migration
+### Phase 2: Gradual Migration (🔄 In Progress)
 
-**Benefits of migration:**
-- Type safety catches errors before runtime
-- IDE autocomplete improves developer experience
-- Cleaner, more maintainable code
-- Easier to understand data flow
+**✅ Completed:**
+
+1. **`src/data/playoffs.py`** - Successfully migrated! ✨
+   - Replaced `self.data.status.is_*()` calls with `game_obj.is_*` properties
+   - Implemented timezone-aware datetime comparisons
+   - Cleaner, more maintainable code
+   - Test run passed successfully
+
+2. **`src/boards/seriesticker.py`** - Successfully migrated! ✨
+   - Added `get_game()` to create Game objects
+   - Replaced legacy status checks with `game_obj.is_live`, `game_obj.is_final`
+   - Improved exception handling
+   - Timezone-aware datetime comparisons
+
+3. **`src/data/scoreboard.py` + `src/renderer/scoreboard.py`** - Major refactor! 🎯
+   - Implemented inheritance: `Scoreboard` extends `GameSummaryBoard`
+   - Both classes now wrap Game objects for state checking
+   - Eliminated 39 lines of duplicate code (11.5% reduction)
+   - Added `@property` delegations to Game object
+   - All state checks now use structured API
+   - Test run passed with no regressions
+
+4. **`src/renderer/main.py`** - Successfully migrated! ✨
+   - Replaced 4 occurrences of `status.is_*()` with `scoreboard.is_*` properties
+   - Main game loop now uses structured API
+   - Leverages inheritance refactor from scoreboard classes
+
+5. **`src/data/data.py`** - Successfully migrated! ✨
+   - Replaced `status.is_final()` with `game_obj.is_final`
+   - Game selection logic now uses Game objects
+   - Type-safe state checking in core data module
+
+**🎉 Phase 2A Complete - All Primary Game State Checks Migrated!**
+
+**Remaining Work (Optional):**
+- [ ] `status.is_irregular()` - 4 occurrences (requires GameState enum extension)
+- [ ] Other board modules that might benefit from structured API
+- [ ] Consider deprecating Status class methods that are no longer used
+
+**Benefits of migration (proven across 3 files):**
+- ✅ Type safety catches errors before runtime
+- ✅ IDE autocomplete improves developer experience
+- ✅ Cleaner, more maintainable code (fewer lines, more readable)
+- ✅ Easier to understand data flow
+- ✅ No manual string parsing needed
+- ✅ Reduced code duplication through inheritance
+- ✅ Single source of truth for game state logic
 
 ### Phase 3: Cleanup (🔮 Future)
 **After migration complete:**
@@ -190,6 +285,28 @@ for game in games:
 - [ ] Remove legacy object wrappers (`MultiLevelObject`, old `PlayerStats`)
 - [ ] Simplify `info.py` (migrate useful code to models)
 - [ ] Remove redundant top-level `__init__.py` wrappers
+
+### Phase 4: Final Normalization (🔮 Future)
+
+**After all legacy code removed:**
+
+- [ ] Rename `get_player_structured()` → `get_player()` (remove suffix)
+- [ ] Rename `get_standings_structured()` → `get_standings()` (remove suffix)
+- [ ] Update all imports to use new names
+- [ ] Result: Perfect naming consistency across all functions
+
+**Final API (End Goal):**
+
+```python
+# All functions follow same pattern, all return structured objects
+get_games(date_obj) -> List[Game]
+get_game(game_id) -> Game
+get_player(player_id) -> Player          # Clean name, no suffix
+get_standings() -> Standings              # Clean name, no suffix
+get_team_schedule(team_code, season) -> Schedule
+get_playoff_data(season) -> Playoff
+# ... etc.
+```
 
 ---
 
