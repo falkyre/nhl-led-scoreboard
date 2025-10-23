@@ -221,7 +221,7 @@ class Seriesticker:
 
                     # get the scoreboard
                     try:
-                        scoreboard = Scoreboard(overview, self.data)
+                        scoreboard = Scoreboard(overview, self.data, game_obj)
                     except Exception:
                         break
 

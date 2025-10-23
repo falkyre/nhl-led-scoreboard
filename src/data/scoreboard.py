@@ -1,20 +1,12 @@
-from data.team import TeamScore
-from data.periods import Periods
-from utils import convert_time
-from time import sleep
 import logging
 from datetime import datetime
 
-debug = logging.getLogger("scoreboard")
-"""
-    TODO:
-        Split the current Scoreboard class into two:
-            - scoreboard (subclass of game, only showing minimum data of a game like the status, score, away and home etc...  )
-            - game (for the overview, load all the static data like players, away and home teams etc... on init 
-            and have methods to refresh the dynamic data like score, goals, penalty etc...)
+from data.periods import Periods
+from data.team import TeamScore
+from nhl_api.data import get_game
+from utils import convert_time
 
-        This will affect how the Data module init and refresh games. Need to test figure what this change will affect.
-"""
+debug = logging.getLogger("scoreboard")
 
 def filter_plays(plays, away_id, home_id):
     """
@@ -34,7 +26,7 @@ def filter_plays(plays, away_id, home_id):
             scoring_plays.append(play)
         if play["typeDescKey"] == "penalty":
             penalty_plays.append(play)
-    
+
     away_goal_plays = [ x for x in scoring_plays if x["details"]["eventOwnerTeamId"] == away_id]
     home_goal_plays = [ x for x in scoring_plays if x["details"]["eventOwnerTeamId"] == home_id]
     away_penalties = [ x for x in penalty_plays if x["details"]["eventOwnerTeamId"] == away_id]
@@ -50,7 +42,7 @@ def get_goal_players(play_details, roster, opposing_roster):
     scorer = {}
     assists = []
     goalie = {}
-    
+
     scorer["info"] = roster[play_details["scoringPlayerId"]]
     # Likely need to check if these are None first
     if play_details.get("assist1PlayerId"):
@@ -73,163 +65,12 @@ def get_penalty_players(play_details, roster):
         player_id = play_details["servedByPlayerId"]
     return roster[player_id]
 
-class Scoreboard:
-    def __init__(self, overview, data):
-        time_format = data.config.time_format
-        # linescore = overview.linescore
-
-        # away = linescore.teams.away
-        away_team = overview["awayTeam"]
-        away_team_id = away_team["id"]
-        if "name" in away_team:
-            away_team_name = away_team["name"]["default"]
-        else:
-            away_team_name = away_team["commonName"]["default"]
-
-        away_abbrev = data.teams_info[away_team_id].details.abbrev
-
-        # home = linescore.teams.home
-        home_team = overview["homeTeam"]
-        home_team_id = home_team["id"]
-        if "name" in home_team:
-            home_team_name = home_team["name"]["default"]
-        else:
-            home_team_name = home_team["commonName"]["default"]
-
-        home_abbrev = data.teams_info[home_team_id].details.abbrev
-
-        away_goal_plays = []
-        home_goal_plays = []
-
-        away_penalties = []
-        home_penalties = []
-
-        self.away_roster = {}
-        self.home_roster = {}
-        for player in overview["rosterSpots"]:
-            if player["teamId"] == home_team_id:
-                self.home_roster[player["playerId"]] = player
-            else:
-                self.away_roster[player["playerId"]] = player
-
-        home_skaters = 5
-        away_skaters = 5
-        if len(overview["plays"]) > 0:
-            plays = overview["plays"]
-            away_scoring_plays, away_penalty_plays, home_scoring_plays, home_penalty_plays = filter_plays(plays,away_team_id,home_team_id)
-            
-            # Get the Away Goal details
-            # If the request to the API fails or is missing who scorer and the assists are, return an empty list of goal plays
-            # This method is there to prevent the goal board to display the wrong info
-            for play in away_scoring_plays:
-                try:
-                # print(play)
-                    players = get_goal_players(play["details"], self.away_roster, self.home_roster)
-                    away_goal_plays.append(Goal(play, players))
-                except KeyError:
-                    debug.error("Failed to get Goal details for current live game. will retry on data refresh")
-                    away_goal_plays = []
-                    break
-            # Get the Home Goal details
-            # If the request to the API fails or is missing who scorer and the assists are, return an empty list of goal plays
-            # This method is there to prevent the goal board to display the wrong info
-            for play in home_scoring_plays:
-                try:
-                    players = get_goal_players(play["details"], self.home_roster, self.away_roster)
-                    home_goal_plays.append(Goal(play,players))
-                except KeyError:
-                    debug.error("Failed to get Goal details for current live game. will retry on data refresh")
-                    home_goal_plays = []
-                    break
-
-            for play in away_penalty_plays:
-                try:
-                    player = get_penalty_players(play["details"], self.away_roster)
-                    away_penalties.append(Penalty(play, player))
-                except KeyError:
-                     debug.error("Failed to get Goal details for current live game. will retry on data refresh")
-                     away_penalties = []
-                     break
-
-            for play in home_penalty_plays:
-                try:
-                    player = get_penalty_players(play["details"], self.home_roster)
-                    home_penalties.append(Penalty(play,player))
-                except KeyError:
-                     debug.error("Failed to get Goal details for current live game. will retry on data refresh")
-                     home_penalties = []
-                     break
-
-        home_pp = False
-        away_pp = False
-        home_goalie_pulled = False
-        away_goalie_pulled = False
-
-        # TODO: I'm not entirely sure what's going on with situation
-        try:
-            if overview.get("situation"):
-                home_skaters = overview["situation"]["homeTeam"]["strength"]
-                away_skaters = overview["situation"]["awayTeam"]["strength"]
-                if overview["situation"]["homeTeam"].get("situationDescriptions"):
-                    if "PP" in overview["situation"]["homeTeam"]["situationDescriptions"]:
-                        home_pp = True
-                    if "EN" in overview["situation"]["homeTeam"]["situationDescriptions"]:
-                        home_goalie_pulled = True
-                if overview["situation"]["awayTeam"].get("situationDescriptions"):
-                    if "PP" in overview["situation"]["awayTeam"]["situationDescriptions"]:
-                        away_pp = True
-                    if "EN" in overview["situation"]["awayTeam"]["situationDescriptions"]:
-                        away_goalie_pulled = True
-            #else:
-                #debug.info("No situation data")
-        except:
-            debug.info("Situation Load Error")
-            exit()
-
-        away_team_sog = away_team["sog"] if away_team.get("sog") else 0
-        home_team_sog = home_team["sog"] if home_team.get("sog") else 0
-        self.away_team = TeamScore(away_team_id, away_abbrev, away_team_name, overview["awayTeam"]["score"], away_team_sog, away_penalties, away_pp, away_skaters, away_goalie_pulled, away_goal_plays)
-        self.home_team = TeamScore(home_team_id, home_abbrev, home_team_name, overview["homeTeam"]["score"], home_team_sog, home_penalties, home_pp, home_skaters, home_goalie_pulled, home_goal_plays)
-    
-        self.date = datetime.strptime(overview["gameDate"],'%Y-%m-%d').strftime("%b %d")
-        self.start_time = convert_time(datetime.strptime(overview["startTimeUTC"],'%Y-%m-%dT%H:%M:%SZ')).strftime(time_format)
-        self.status = overview["gameState"]
-        self.periods = Periods(overview)
-        
-        try:
-            self.intermission = overview["clock"]["inIntermission"]
-        except:
-            self.intermission = False
-
-        if overview["gameState"] == "OFF" or overview["gameState"] == "FINAL":
-            if away_team["score"] > home_team["score"]:
-                self.winning_team_id = overview["awayTeam"]["id"]
-                self.winning_score = overview["awayTeam"]["score"]
-                self.losing_team_id = overview["homeTeam"]["id"]
-                self.losing_score = overview["homeTeam"]["score"]
-            else:
-                self.losing_team_id = overview["awayTeam"]["id"]
-                self.losing_score = overview["awayTeam"]["score"]
-                self.winning_team_id = overview["homeTeam"]["id"]
-                self.winning_score = overview["homeTeam"]["score"]
-
-    
-
-    def __str__(self):
-        output = "<{} {}> {} (G {}, SOG {}) @ {} (G {}, SOG {}); Status: {}; Period : {} {};".format(
-            self.__class__.__name__, hex(id(self)),
-            self.away_team.name, str(self.away_team.goals), str(self.away_team.shot_on_goal),
-            self.home_team.name, str(self.home_team.goals), str(self.home_team.shot_on_goal),
-            self.status,
-            self.periods.ordinal,
-            self.periods.clock
-        )
-        return output
-
 class GameSummaryBoard:
-    def __init__(self, game_details, data):
+    def __init__(self, game_details, data, game_obj=None):
         time_format = data.config.time_format
-        # linescore = overview.linescore
+
+        # Store game - create if not provided
+        self._game = game_obj if game_obj else get_game(game_details["id"])
 
         # away = linescore.teams.away
         away_team = game_details["awayTeam"]
@@ -278,7 +119,28 @@ class GameSummaryBoard:
                 self.winning_team_id = game_details["homeTeam"]["id"]
                 self.winning_score = game_details["homeTeam"]["score"]
 
-    
+    # Game state properties - delegate to Game object
+    @property
+    def is_scheduled(self) -> bool:
+        """Check if game is scheduled (not started)"""
+        return self._game.is_scheduled
+
+    @property
+    def is_live(self) -> bool:
+        """Check if game is currently live"""
+        return self._game.is_live
+
+    @property
+    def is_game_over(self) -> bool:
+        """Check if game is over but not yet official"""
+        # Note: Game object treats OVER as part of is_final
+        # Keep backward compat by checking status string directly
+        return self.status == "OVER"
+
+    @property
+    def is_final(self) -> bool:
+        """Check if game is final"""
+        return self._game.is_final
 
     def __str__(self):
         output = "<{} {}> {} (G {}, SOG {}) @ {} (G {}, SOG {}); Status: {}; Period : {} {};".format(
@@ -291,6 +153,131 @@ class GameSummaryBoard:
         )
         return output
 
+class Scoreboard(GameSummaryBoard):
+    """Full scoreboard with play-by-play details, extends GameSummaryBoard"""
+
+    def __init__(self, overview, data, game_obj=None):
+        # Call parent constructor to get basic game info
+        super().__init__(overview, data, game_obj)
+
+        # Now add the detailed play-by-play parsing that only Scoreboard needs
+        away_team = overview["awayTeam"]
+        away_team_id = away_team["id"]
+        home_team = overview["homeTeam"]
+        home_team_id = home_team["id"]
+
+        away_goal_plays = []
+        home_goal_plays = []
+        away_penalties = []
+        home_penalties = []
+
+        # Parse rosters
+        self.away_roster = {}
+        self.home_roster = {}
+        for player in overview["rosterSpots"]:
+            if player["teamId"] == home_team_id:
+                self.home_roster[player["playerId"]] = player
+            else:
+                self.away_roster[player["playerId"]] = player
+
+        # Parse plays (goals and penalties)
+        home_skaters = 5
+        away_skaters = 5
+        if len(overview["plays"]) > 0:
+            plays = overview["plays"]
+            away_scoring_plays, away_penalty_plays, home_scoring_plays, home_penalty_plays = filter_plays(plays, away_team_id, home_team_id)
+
+            # Get the Away Goal details
+            for play in away_scoring_plays:
+                try:
+                    players = get_goal_players(play["details"], self.away_roster, self.home_roster)
+                    away_goal_plays.append(Goal(play, players))
+                except KeyError:
+                    debug.error("Failed to get Goal details for current live game. will retry on data refresh")
+                    away_goal_plays = []
+                    break
+
+            # Get the Home Goal details
+            for play in home_scoring_plays:
+                try:
+                    players = get_goal_players(play["details"], self.home_roster, self.away_roster)
+                    home_goal_plays.append(Goal(play, players))
+                except KeyError:
+                    debug.error("Failed to get Goal details for current live game. will retry on data refresh")
+                    home_goal_plays = []
+                    break
+
+            # Get penalties
+            for play in away_penalty_plays:
+                try:
+                    player = get_penalty_players(play["details"], self.away_roster)
+                    away_penalties.append(Penalty(play, player))
+                except KeyError:
+                    debug.error("Failed to get Penalty details for current live game. will retry on data refresh")
+                    away_penalties = []
+                    break
+
+            for play in home_penalty_plays:
+                try:
+                    player = get_penalty_players(play["details"], self.home_roster)
+                    home_penalties.append(Penalty(play, player))
+                except KeyError:
+                    debug.error("Failed to get Penalty details for current live game. will retry on data refresh")
+                    home_penalties = []
+                    break
+
+        # Parse game situation (power plays, goalie pulled, etc.)
+        home_pp = False
+        away_pp = False
+        home_goalie_pulled = False
+        away_goalie_pulled = False
+
+        try:
+            if overview.get("situation"):
+                home_skaters = overview["situation"]["homeTeam"]["strength"]
+                away_skaters = overview["situation"]["awayTeam"]["strength"]
+                if overview["situation"]["homeTeam"].get("situationDescriptions"):
+                    if "PP" in overview["situation"]["homeTeam"]["situationDescriptions"]:
+                        home_pp = True
+                    if "EN" in overview["situation"]["homeTeam"]["situationDescriptions"]:
+                        home_goalie_pulled = True
+                if overview["situation"]["awayTeam"].get("situationDescriptions"):
+                    if "PP" in overview["situation"]["awayTeam"]["situationDescriptions"]:
+                        away_pp = True
+                    if "EN" in overview["situation"]["awayTeam"]["situationDescriptions"]:
+                        away_goalie_pulled = True
+        except Exception:
+            debug.info("Situation Load Error")
+            exit()
+
+        # Override parent's TeamScore with enriched version (includes goals, penalties, etc.)
+        away_team_sog = away_team["sog"] if away_team.get("sog") else 0
+        home_team_sog = home_team["sog"] if home_team.get("sog") else 0
+        self.away_team = TeamScore(
+            away_team_id,
+            self.away_team.abbrev,  # Get abbrev from parent
+            self.away_team.name,     # Get name from parent
+            overview["awayTeam"]["score"],
+            away_team_sog,
+            away_penalties,
+            away_pp,
+            away_skaters,
+            away_goalie_pulled,
+            away_goal_plays
+        )
+        self.home_team = TeamScore(
+            home_team_id,
+            self.home_team.abbrev,  # Get abbrev from parent
+            self.home_team.name,     # Get name from parent
+            overview["homeTeam"]["score"],
+            home_team_sog,
+            home_penalties,
+            home_pp,
+            home_skaters,
+            home_goalie_pulled,
+            home_goal_plays
+        )
+
 class Goal:
     def __init__(self, play, players):
         self.scorer = players["scorer"]
@@ -299,7 +286,7 @@ class Goal:
         self.team = play["details"]["eventOwnerTeamId"]
         self.period = play["periodDescriptor"]["number"]
         self.periodTime = play["timeInPeriod"]
-        
+
 class Penalty:
     def __init__(self, play, player):
         self.player = player
