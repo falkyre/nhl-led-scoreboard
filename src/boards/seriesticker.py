@@ -1,17 +1,18 @@
 """
     Shows list of series summary (Table with each result of game).
 """
-from time import sleep
-from datetime import datetime
-from utils import center_obj
+import logging
+from datetime import datetime, timezone
+
+from PIL import Image
+
+from data.data import Data
+
 # from data.playoffs import Series
 from data.scoreboard import Scoreboard
-from data.data import Data
-from renderer.matrix import MatrixPixels, Matrix
-import logging
-from PIL import Image
+from nhl_api.data import get_game
+from renderer.matrix import Matrix, MatrixPixels
 from utils import get_file
-# import nhlpy
 
 debug = logging.getLogger("scoreboard")
 
@@ -21,10 +22,10 @@ class Seriesticker:
         self.matrix = matrix
         self.sleepEvent = sleepEvent
         self.sleepEvent.clear()
-        
+
         self.layout = self.data.config.config.layout.get_board_layout('seriesticker')
         self.team_colors = self.data.config.team_colors
-        
+
 
         self.top_seed_scores = [
             self.layout.top_seed_score_1,
@@ -81,17 +82,20 @@ class Seriesticker:
         playoff_series = self.data.series
         self.index = 0
 
-        # Check option to hide completed rounds and filter 
+        # Check option to hide completed rounds and filter
         if self.data.config.seriesticker_hide_completed_rounds:
-            playoff_series = [s for s in self.data.series if getattr(s, "round_number", 0) >= self.data.current_round["roundNumber"]]
-        
+            playoff_series = [
+                s for s in self.data.series
+                if getattr(s, "round_number", 0) >= self.data.current_round["roundNumber"]
+            ]
+
         self.num_series = len(playoff_series)
 
         for series in playoff_series:
             self.matrix.clear()
             banner_text = "STANLEY CUP"
             color_banner_bg = (200,200,200)
-            round_name = "FINAL" 
+            round_name = "FINAL"
 
             # Draw Stanley Cup logo on larger displays
             if self.stanley_cup_logo:
@@ -106,7 +110,7 @@ class Seriesticker:
                 try:
                     color_conf = self.team_colors.color("{}.primary".format(series.conference))
                     banner_text = series.conference[:4].upper()
-                except:
+                except Exception:
                     color_conf = self.team_colors.color("{}.primary".format("Western"))
                     banner_text = "WEST"
                 color_banner_bg = (color_conf['r'], color_conf['g'], color_conf['b'])
@@ -121,8 +125,8 @@ class Seriesticker:
             else:
                 # EAST/WEST - 1ST/2ND ROUND
                 banner_text = f"{banner_text} - {round_name}"
-            
-                
+
+
             top_team_wins = series.top_team.series_wins
             bottom_team_wins = series.bottom_team.series_wins
 
@@ -149,13 +153,13 @@ class Seriesticker:
             # Conference banner, Round Title
             self.matrix.draw_text_layout(
                 self.layout.header,
-                banner_text, 
+                banner_text,
                 align="left",
                 fillColor=(0,0,0,),
                 backgroundColor=color_banner_bg,
                 backgroundOffset=self.header_padding
             )
-            
+
             self.draw_series_table(series)
 
             self.matrix.draw_text_layout(
@@ -186,7 +190,7 @@ class Seriesticker:
         )
         self.matrix.draw_text_layout(
             self.layout.top_seed,
-            series.top_team.abbrev, 
+            series.top_team.abbrev,
             fillColor=(color_top_team['r'], color_top_team['g'], color_top_team['b'])
         )
 
@@ -196,10 +200,10 @@ class Seriesticker:
         )
         self.matrix.draw_text_layout(
             self.layout.bottom_seed,
-            series.bottom_team.abbrev, 
+            series.bottom_team.abbrev,
             fillColor=(color_bottom_team['r'], color_bottom_team['g'], color_bottom_team['b'])
         )
-        
+
         loosing_color = (150,150,150)
         loosing_color_bg = (0,0,0)
 
@@ -209,17 +213,20 @@ class Seriesticker:
             attempts_remaining = 5
             while attempts_remaining > 0:
                 try:
-                    # get the game overview
+                    # Get the game object
+                    game_obj = get_game(game["id"])
+
+                    # Get the game overview
                     overview = series.get_game_overview(game["id"])
-                    
+
                     # get the scoreboard
                     try:
                         scoreboard = Scoreboard(overview, self.data)
-                    except:
+                    except Exception:
                         break
-                    
+
                     # If the game is final, draw the winning and loosing team scores
-                    if (self.data.status.is_final(overview["gameState"]) or self.data.status.is_game_over(overview["gameState"])) and hasattr(scoreboard, "winning_team_id"):
+                    if (game_obj.is_final and hasattr(scoreboard, "winning_team_id")):
                         if scoreboard.winning_team_id == series.top_team.id:
                             winning_layout = self.top_seed_scores[game_count - 1]
                             winning_layout_bg = self.top_seed_scores_bg[game_count - 1]
@@ -242,19 +249,19 @@ class Seriesticker:
 
                         self.matrix.draw_rectangle_layout(
                             winning_layout_bg,
-                            fillColor=(winning_bg_color['r'], winning_bg_color['g'], winning_bg_color['b']), 
+                            fillColor=(winning_bg_color['r'], winning_bg_color['g'], winning_bg_color['b']),
                         )
 
                         self.matrix.draw_text_layout(
                             loosing_layout,
-                            str(scoreboard.losing_score),  
+                            str(scoreboard.losing_score),
                             fillColor=loosing_color
                         )
 
                         self.matrix.draw_text_layout(
                             winning_layout,
-                            str(scoreboard.winning_score),  
-                            fillColor=(winning_team_color['r'], winning_team_color['g'], winning_team_color['b']), 
+                            str(scoreboard.winning_score),
+                            fillColor=(winning_team_color['r'], winning_team_color['g'], winning_team_color['b']),
                         )
 
                     # process the "current game" -- which is the current or next game
@@ -263,9 +270,9 @@ class Seriesticker:
                         series_overview_game = ""
                         next_game_number = series.top_team.series_wins + series.bottom_team.series_wins + 1
                         if self.matrix.width >= 128:
-                            if self.data.status.is_live(scoreboard.status):
-                                series_overview_game = f"GAME IS LIVE"
-                            elif scoreboard.date == datetime.now().strftime("%b %d"):
+                            if game_obj.is_live:
+                                series_overview_game = "GAME IS LIVE"
+                            elif scoreboard.date == datetime.now(timezone.utc).strftime("%b %d"):
                                 series_overview_game = f"GAME {next_game_number}: TODAY @ {scoreboard.start_time}"
                             else:
                                 game_date = scoreboard.date.upper()
@@ -274,7 +281,7 @@ class Seriesticker:
                             self.matrix.draw_text_layout(
                                 self.layout.overview_game,
                                 series_overview_game
-                            )                        
+                            )
 
                     # If the game doesnt hit a condition above, break the loop
                     # this assumes games are in order from oldest to newest
@@ -283,12 +290,22 @@ class Seriesticker:
 
                 except ValueError as error_message:
                     self.data.network_issues = True
-                    debug.error("Failed to get the Games for the {} VS {} series: {} attempts remaining".format(series.top_team.abbrev, series.bottom_team.abbrev, attempts_remaining))
+                    debug.error(
+                        "Failed to get the Games for the {} VS {} series: {} attempts remaining".format(
+                            series.top_team.abbrev,
+                            series.bottom_team.abbrev,
+                            attempts_remaining,
+                        )
+                    )
                     debug.error(error_message)
                     attempts_remaining -= 1
                     self.sleepEvent.wait(1)
                 except KeyError as error_message:
-                    debug.error("Failed to get the overview for game id {}. Data unavailable or is TBD".format(game["gameId"]))
+                    debug.error(
+                        "Failed to get the overview for game id {}. Data unavailable or is TBD".format(
+                            game["gameId"]
+                        )
+                    )
                     debug.error(error_message)
                     break
             # If one of the request for player info failed after 5 attempts, return an empty dictionary
@@ -325,7 +342,7 @@ class Seriesticker:
 
             pixels.append(
               MatrixPixels(
-                ((align + dot_position), 0), 
+                ((align + dot_position), 0),
                 color
               )
             )
