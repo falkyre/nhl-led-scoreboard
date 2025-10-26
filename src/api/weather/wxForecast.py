@@ -3,7 +3,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-import requests
+import httpx
 
 from api.weather.wx_utils import get_csv
 
@@ -164,7 +164,7 @@ class wxForecast(object):
 
             try:
                 url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&units={self.data.config.weather_units}&appid={self.apikey}&exclude=alerts,minutely,hourly,current"
-                response = requests.get(url)
+                response = httpx.get(url)
                 one_call = response.json()
                 debug.debug(f"OWM forecast raw: {one_call}")
 

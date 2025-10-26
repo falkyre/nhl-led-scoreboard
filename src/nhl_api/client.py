@@ -14,7 +14,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import backoff
-import requests
+import httpx
 
 if TYPE_CHECKING:
     from nhl_api.models import Game, Player, Standings
@@ -56,16 +56,39 @@ class NHLAPIClient:
         self.ssl_verify = ssl_verify
         self._session = self._create_session()
 
-    def _create_session(self) -> requests.Session:
-        """Create a requests session with default configuration."""
-        session = requests.Session()
-        session.verify = self.ssl_verify
-        return session
+    def _create_session(self) -> httpx.Client:
+        """Create an httpx client with default configuration."""
+        return httpx.Client(
+            verify=self.ssl_verify,
+            timeout=self.timeout,
+            follow_redirects=True  # Follow redirects by default (like requests)
+        )
+
+    def _should_retry(e):
+        """
+        Determine if we should retry the request.
+
+        Don't retry on:
+        - 429 (rate limit) - Making more requests makes it worse
+        - 4xx client errors (except 429 handled above)
+
+        Do retry on:
+        - Network errors (connection, timeout)
+        - 5xx server errors
+        """
+        if isinstance(e, httpx.HTTPStatusError):
+            # Don't retry on rate limit or client errors
+            if e.response.status_code == 429:
+                return False
+            if 400 <= e.response.status_code < 500:
+                return False
+        return True
 
     @backoff.on_exception(
         backoff.expo,
-        requests.exceptions.RequestException,
+        httpx.RequestError,
         max_tries=MAX_RETRIES,
+        giveup=lambda e: not NHLAPIClient._should_retry(e),
         logger='scoreboard'
     )
     def _request(self, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -103,18 +126,18 @@ class NHLAPIClient:
 
             return json_data
 
-        except requests.exceptions.Timeout as e:
+        except httpx.TimeoutException as e:
             logger.error(f"NHL API Timeout: {url} (timeout: {self.timeout}s) - {e}")
             raise NHLAPIError(f"Request timed out: {url}") from e
-        except requests.exceptions.HTTPError as e:
+        except httpx.HTTPStatusError as e:
             logger.error(f"NHL API HTTP Error: {e.response.status_code} for {url} - {e}")
             if hasattr(e.response, 'text'):
                 logger.debug(f"Response body: {e.response.text[:500]}")  # First 500 chars
             raise NHLAPIError(f"HTTP error: {e.response.status_code}") from e
-        except requests.exceptions.ConnectionError as e:
+        except httpx.ConnectError as e:
             logger.error(f"NHL API Connection Error: Failed to connect to {url} - {e}")
             raise NHLAPIError(f"Connection failed: {url}") from e
-        except requests.exceptions.RequestException as e:
+        except httpx.RequestError as e:
             logger.error(f"NHL API Request Failed: {url} - {e}")
             raise NHLAPIError(f"Request failed: {url}") from e
         except ValueError as e:

@@ -2,7 +2,7 @@ import datetime
 import json
 import logging
 
-import requests
+import httpx
 from noaa_sdk import noaa
 
 from api.weather.wx_utils import get_csv
@@ -72,9 +72,9 @@ class nwsWxAlerts(object):
 
         #See if the api.weather.gov site is available, if not throw error code and jump out of loop
         try:
-            r = requests.get(BASE_URL, timeout=REQUEST_TIMEOUT)
+            r = httpx.get(BASE_URL, timeout=REQUEST_TIMEOUT)
             debug.info("NWS alerts {} returned status code: {}".format(BASE_URL,r.status_code))
-        except requests.exceptions as e:
+        except httpx.RequestError as e:
             #raise ValueError(e)
             debug.error(e)
             self.network_issues = True

@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime
 
-import requests
+import httpx
 
 from api.weather.wx_utils import degrees_to_direction, dew_point, get_csv, temp_f, usaheatindex, wind_chill, wind_kmph
 from utils import sb_cache
@@ -40,9 +40,9 @@ class owmWxWorker(object):
             if wx_cache is None:
                 debug.info("Refreshing OWM current observations weather")
 
-                # Fetch weather data using requests
+                # Fetch weather data using httpx
                 url = f"https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&units={self.data.config.weather_units}&appid={self.apikey}&exclude=minutely,hourly,daily,alerts"
-                response = requests.get(url)
+                response = httpx.get(url)
                 wx = response.json()
 
                 # If the API request fails, raise an error

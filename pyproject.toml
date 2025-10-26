@@ -13,6 +13,7 @@ dependencies = [
     "ephem>=4.1.6",
     "fastjsonschema>=2.14.4",
     "geopy>=2.4.1",
+    "httpx>=0.27.0",
     "ipinfo>=5.1.1",
     "iso6709>=0.1.5",
     "lastversion>=1.1.6",
