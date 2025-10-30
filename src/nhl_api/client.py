@@ -76,6 +76,10 @@ class NHLAPIClient:
         - Network errors (connection, timeout)
         - 5xx server errors
         """
+        # Always retry timeouts
+        if isinstance(e, httpx.TimeoutException):
+            return True
+
         if isinstance(e, httpx.HTTPStatusError):
             # Don't retry on rate limit or client errors
             if e.response.status_code == 429:
@@ -91,9 +95,46 @@ class NHLAPIClient:
         giveup=lambda e: not NHLAPIClient._should_retry(e),
         logger='scoreboard'
     )
+    def _request_with_retry(self, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Internal method that makes HTTP GET request with automatic retries.
+
+        This method is wrapped by the backoff decorator for retry logic.
+
+        Args:
+            url: Full URL to request
+            params: Optional query parameters
+
+        Returns:
+            Parsed JSON response
+
+        Raises:
+            httpx.RequestError: On network/HTTP errors (will be retried by decorator)
+            ValueError: On JSON parse errors (not retried)
+        """
+        # Log request details
+        if params:
+            logger.debug(f"NHL API Request: {url} (params: {params})")
+        else:
+            logger.debug(f"NHL API Request: {url}")
+
+        # Make the request
+        response = self._session.get(url, params=params, timeout=self.timeout)
+
+        # Log response status
+        logger.debug(f"NHL API Response: {response.status_code} ({len(response.content)} bytes)")
+
+        response.raise_for_status()
+        json_data = response.json()
+
+        # Log successful parse
+        logger.debug("NHL API: Successfully parsed JSON response")
+
+        return json_data
+
     def _request(self, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Make HTTP GET request with retry logic.
+        Make HTTP GET request with retry logic and error handling.
 
         Args:
             url: Full URL to request
@@ -106,44 +147,23 @@ class NHLAPIClient:
             NHLAPIError: If request fails after retries
         """
         try:
-            # Log request details
-            if params:
-                logger.debug(f"NHL API Request: {url} (params: {params})")
-            else:
-                logger.debug(f"NHL API Request: {url}")
-
-            # Make the request
-            response = self._session.get(url, params=params, timeout=self.timeout)
-
-            # Log response status
-            logger.debug(f"NHL API Response: {response.status_code} ({len(response.content)} bytes)")
-
-            response.raise_for_status()
-            json_data = response.json()
-
-            # Log successful parse
-            logger.debug("NHL API: Successfully parsed JSON response")
-
-            return json_data
-
+            return self._request_with_retry(url, params)
         except httpx.TimeoutException as e:
-            logger.error(f"NHL API Timeout: {url} (timeout: {self.timeout}s) - {e}")
-            raise NHLAPIError(f"Request timed out: {url}") from e
+            logger.error(f"NHL API Timeout after {self.MAX_RETRIES} retries: {url} (timeout: {self.timeout}s)")
+            raise NHLAPIError(f"Request timed out after {self.MAX_RETRIES} retries: {url}") from e
         except httpx.HTTPStatusError as e:
-            logger.error(f"NHL API HTTP Error: {e.response.status_code} for {url} - {e}")
+            logger.error(f"NHL API HTTP Error: {e.response.status_code} for {url}")
             if hasattr(e.response, 'text'):
                 logger.debug(f"Response body: {e.response.text[:500]}")  # First 500 chars
-            raise NHLAPIError(f"HTTP error: {e.response.status_code}") from e
+            raise NHLAPIError(f"HTTP error {e.response.status_code}: {url}") from e
         except httpx.ConnectError as e:
-            logger.error(f"NHL API Connection Error: Failed to connect to {url} - {e}")
-            raise NHLAPIError(f"Connection failed: {url}") from e
+            logger.error(f"NHL API Connection Error after {self.MAX_RETRIES} retries: Failed to connect to {url}")
+            raise NHLAPIError(f"Connection failed after {self.MAX_RETRIES} retries: {url}") from e
         except httpx.RequestError as e:
-            logger.error(f"NHL API Request Failed: {url} - {e}")
-            raise NHLAPIError(f"Request failed: {url}") from e
+            logger.error(f"NHL API Request Failed after {self.MAX_RETRIES} retries: {url}")
+            raise NHLAPIError(f"Request failed after {self.MAX_RETRIES} retries: {url}") from e
         except ValueError as e:
             logger.error(f"NHL API JSON Parse Error: Invalid JSON from {url} - {e}")
-            if 'response' in locals():
-                logger.debug(f"Response body: {response.text[:500]}")  # First 500 chars
             raise NHLAPIError(f"Invalid JSON response: {url}") from e
 
     # =========================================================================
