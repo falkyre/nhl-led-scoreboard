@@ -769,7 +769,7 @@
     "title": {
       "position": [124, 2],
       "align": "right-top",
-      "font": "wx_small"
+      "font": "small_2"
     },
     "name": {
       "position": [125, 10],
