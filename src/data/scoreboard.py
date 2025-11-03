@@ -142,6 +142,11 @@ class GameSummaryBoard:
         """Check if game is final"""
         return self._game.is_final
 
+    @property
+    def is_irregular(self) -> bool:
+        """Check if game has irregular status (postponed, cancelled, suspended, TBD)"""
+        return self._game.is_irregular
+
     def __str__(self):
         output = "<{} {}> {} (G {}, SOG {}) @ {} (G {}, SOG {}); Status: {}; Period : {} {};".format(
             self.__class__.__name__, hex(id(self)),

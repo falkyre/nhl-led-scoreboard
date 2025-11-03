@@ -239,8 +239,8 @@ class MainRenderer:
                 self.boards._scheduled(self.data, self.matrix,self.sleepEvent)
 
 
-            elif self.status.is_irregular(self.data.overview["gameState"]):
-                """ Pre-game state """
+            elif self.scoreboard.is_irregular:
+                """ Irregular game state (postponed, cancelled, suspended, TBD) """
                 debug.info("Game is irregular")
                 sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
                 self.__render_irregular(sbrenderer)

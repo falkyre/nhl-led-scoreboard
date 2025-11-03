@@ -67,8 +67,7 @@ class ScoreboardRenderer:
         if self.scoreboard.is_final:
             self.draw_final()
 
-        if self.status.is_irregular(self.scoreboard.status):
-            '''TODO: Need to figure out the irregular status'''
+        if self.scoreboard.is_irregular:
             self.draw_irregular()
 
     def draw_scheduled(self):

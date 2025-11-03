@@ -189,7 +189,7 @@ class TeamSummary:
                 draw.text((0, 28), "VS {}".format(prev_game_scoreboard.away_team.abbrev), fill=(255, 255, 255),
                         font=self.font)
 
-            if self.data.status.is_irregular(prev_game_scoreboard.status):
+            if prev_game_scoreboard.is_irregular:
                 draw.text((0, 34), prev_game_scoreboard.status, fill=(255, 0, 0), font=self.font)
 
             else:
@@ -215,7 +215,7 @@ class TeamSummary:
             date = next_game_scoreboard.date
             draw.text((0, 49), "{}".format(date.upper()), fill=(255, 255, 255), font=self.font)
 
-            if self.data.status.is_irregular(next_game_scoreboard.status):
+            if next_game_scoreboard.is_irregular:
                 if next_game_scoreboard.status == "Scheduled (Time TBD)":
                     next_game_scoreboard.status = "TBD"
                 draw.text((0, 55), "{}".format(next_game_scoreboard.status.upper()), fill=(255, 0, 0), font=self.font)

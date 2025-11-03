@@ -22,6 +22,11 @@ class GameState(Enum):
     CRITICAL = "CRIT"
     FINAL = "FINAL"
     OFFICIAL_FINAL = "OFF"
+    # Irregular game states (codes 8 and 9 in old NHL API)
+    POSTPONED = "POSTPONED"
+    CANCELLED = "CANCELLED"
+    SUSPENDED = "SUSPENDED"
+    TIME_TBD = "TBD"
 
 
 class PlayerPosition(Enum):
@@ -395,6 +400,11 @@ class Game:
     def is_scheduled(self) -> bool:
         """Check if game is scheduled (not started)"""
         return self.state in (GameState.FUTURE, GameState.PREVIEW)
+
+    @property
+    def is_irregular(self) -> bool:
+        """Check if game has irregular status (postponed, cancelled, suspended, TBD)"""
+        return self.state in (GameState.POSTPONED, GameState.CANCELLED, GameState.SUSPENDED, GameState.TIME_TBD)
 
     def __str__(self) -> str:
         return f"{self.away_team.abbrev} @ {self.home_team.abbrev} - {self.score}"
