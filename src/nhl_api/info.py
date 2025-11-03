@@ -22,7 +22,6 @@ import logging
 
 import nhl_api.data
 from nhl_api.nhl_client import client
-from nhl_api.object import MultiLevelObject
 
 debug = logging.getLogger("scoreboard")
 
@@ -53,96 +52,6 @@ def team_info():
 
     return teams_data
 
-    # TODO: I think most of this is now held in the TeamStandings object, but leaving here for reference
-    # for team in teams_data:
-    #     try:
-    #         team_id = team['id']
-    #         name = team['fullName']
-    #         # abbreviation = team['abbreviation']
-    #         # team_name = team['teamName']
-    #         # location_name = team['locationName']
-    #         short_name = team['triCode']
-    #         # division_id = team['division']['id']
-    #         # division_name = team['division']['name']
-    #         # division_abbrev = team['division']['abbreviation']
-    #         # conference_id = team['conference']['id']
-    #         # conference_name = team['conference']['name']
-    #         # official_site_url = team['officialSiteUrl']
-    #         # franchise_id = team['franchiseId']
-
-    #         pg, ng = team_previous_game(short_name, 20232024)
-    #         # print(pg, ng)
-    #         try:
-    #             previous_game = pg
-    #         except:
-    #             debug.debug("No next game detected for {}".format(name))
-    #             previous_game = False
-
-    #         try:
-    #             next_game = ng
-    #         except:
-    #             debug.debug("No next game detected for {}".format(team_name))
-    #             next_game = False
-
-    #         # try:
-    #         #     stats = team['teamStats'][0]['splits'][0]['stat']
-    #         # except:
-    #         #     debug.debug("No Stats detected for {}".format(team_name))
-    #         #     stats = False
-
-    #         # roster = {}
-    #         # for p in team['roster']['roster']:
-    #         #     person = p['person']
-    #         #     person_id = person['id']
-    #         #     name = HumanName(person['fullName'])
-    #         #     first_name = name.first
-    #         #     last_name = name.last
-
-    #         #     position_name = p['position']['name']
-    #         #     position_type = p['position']['abbreviation']
-    #         #     position_abbrev = p['position']['abbreviation']
-
-    #         #     try:
-    #         #         jerseyNumber = p['jerseyNumber']
-    #         #     except KeyError:
-    #         #         jerseyNumber = ""
-
-    #         #     roster[person_id]= {
-    #         #         'firstName': first_name,
-    #         #         'lastName': last_name,
-    #         #         'jerseyNumber': jerseyNumber,
-    #         #         'positionName': position_name,
-    #         #         'positionType': position_type,
-    #         #         'positionAbbrev': position_abbrev
-    #         #         }
-
-
-    #         output = {
-    #             'team_id': team_id,
-    #             'name': name,
-    #             # 'abbreviation': abbreviation,
-    #             'team_name': name,
-    #             # 'location_name': location_name,
-    #             'short_name': short_name,
-    #             # 'division_id': division_id,
-    #             # 'division_name': division_name,
-    #             # 'division_abbrev': division_abbrev,
-    #             # 'conference_id': conference_id,
-    #             # 'conference_name': conference_name,
-    #             # 'official_site_url': official_site_url,
-    #             # 'franchise_id': franchise_id,
-    #             # 'roster': roster,
-    #             'previous_game': previous_game,
-    #             'next_game': next_game,
-    #             # 'stats': stats
-    #         }
-
-    #         # put this dictionary into the larger dictionary
-    #         teams.append(output)
-    #     except:
-    #         print(team)
-    #         debug.error("Missing data in current team info")
-
 def team_next_game_by_code(team_code):
     # Returns the next game and previous game for a team
     parsed = nhl_api.data.get_team_schedule(team_code)
@@ -158,34 +67,48 @@ def team_next_game_by_code(team_code):
 
     return pg, ng
 
-def team_last_game_by_code(team_code):
-    parsed = nhl_api.data.get_team_schedule(team_code)
-    for game in parsed["data"]["games"]:
-        if game["gameState"] == "FINAL":
-            return game
-    return None
-
-
 def team_previous_game(team_code, date, pg = None, ng = None):
     return team_next_game_by_code(team_code)
 
 
 def player_info(playerId):
-    parsed = nhl_api.data.get_player(playerId)
-    player = parsed["people"][0]
+    """
+    Get player information (legacy wrapper).
 
-    return MultiLevelObject(player)
+    Note: This function is kept for backward compatibility through __init__.py.
+    Consider using nhl_api.client.get_player() with Player dataclass instead.
+    """
+    parsed = nhl_api.data.get_player(playerId)
+    # Return raw dict instead of MultiLevelObject since that's deleted
+    return parsed
+
 
 def status():
+    """
+    Get game status information (legacy wrapper).
+
+    Note: Used by __init__.py wrapper for game_status_info().
+    """
     data = nhl_api.data.get_game_status()
     return data
 
 
 def current_season():
+    """
+    Get current season information (legacy wrapper).
+
+    Note: Used by Status class through __init__.py wrapper.
+    """
     data = nhl_api.data.get_current_season()
     return data
 
+
 def next_season():
+    """
+    Get next season schedule information (legacy wrapper).
+
+    Note: Used by Status class through __init__.py wrapper.
+    """
     data = nhl_api.data.get_next_season()
     return data
 

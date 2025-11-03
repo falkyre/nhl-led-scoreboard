@@ -521,10 +521,6 @@ class Data:
         else:
             return False
 
-    #Players
-    def get_players_info(self, playerId):
-        self.players_info = nhl_info.player_info(playerId)
-
     #
     # Playoffs
     def refresh_playoff(self):
