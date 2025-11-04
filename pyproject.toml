@@ -1,6 +1,6 @@
 [project]
 name = "nhl-led-scoreboard"
-version = "2025.10.3"
+version = "2025.11.0"
 description = "🚨 Display NHL score of your favorite team on a Raspberry Pi driven RGB LED matrix. 🚨"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,7 +21,7 @@ dependencies = [
     "nhl-api-py>=2.18.0",
     "noaa-sdk>=0.1.18",
     "paho-mqtt>=2.1.0",
-    "pillow>=11.0.0",
+    "pillow==11.1.0",
     "regex>=2020.4.4",
     "rich>=13.9.4",
     "richcolorlog==1.44.12",
