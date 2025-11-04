@@ -1,9 +1,9 @@
 """
-    TODO: How this whole system works is getting complex for nothing and I need to recode this by sorting into seperate classes instead of having everything into a
+    TODO: How this whole system works is getting complex for nothing
+    and I need to recode this by sorting into seperate classes instead of having everything into a
         single one.
 """
 
-import json
 import logging
 from datetime import date, datetime, timedelta
 from time import sleep
@@ -11,7 +11,7 @@ from time import sleep
 from data.playoffs import Series
 from data.status import Status
 from nhl_api import info as nhl_info
-from nhl_api.data import get_game, get_game_overview, get_playoff_data, get_score_details, get_standings
+from nhl_api.data import get_game, get_game_overview, get_score_details
 from nhl_api.player import PlayerStats
 from utils import get_lat_lng
 
@@ -28,7 +28,7 @@ def filter_list_of_games(games, teams):
     # print(game['awayTeam']['id'], game['homeTeam']['id'])
     pref_games = []
     index = []
-    prev_index = 0
+    #prev_index = 0
     for game in games:
         if game["homeTeam"]["id"] in teams:
             index.append(teams.index(game["homeTeam"]["id"]))
@@ -46,10 +46,18 @@ def filter_list_of_series(series, teams):
     """
     Filter the list 'single_series' and keep only the ones which the teams in the list 'teams' are part of.
 
-        TODO: make a filter_list function that works for both list of games and list of series. need to add lost of attribute to look for and compare (intersection)
+        TODO: make a filter_list function that works for both list of games and list of series.
+        need to add lost of attribute to look for and compare (intersection)
     """
 
-    return list(single_series for single_series in set(series) if {single_series.matchupTeams[0].team.id, single_series.matchupTeams[1].team.id}.intersection(set(teams)))
+    return [
+        single_series
+        for single_series in set(series)
+        if {
+            single_series.matchupTeams[0].team.id,
+            single_series.matchupTeams[1].team.id,
+        }.intersection(set(teams))
+    ]
 
 
 def prioritize_pref_games(games, teams):
@@ -61,7 +69,8 @@ def prioritize_pref_games(games, teams):
 
     return the cleaned game list. lemony fresh!!!
 
-    TODO: For V2, this needs to be changed to return game list in different order, instead of a single way. Having that handled by different methods is the way.... this is the way !!!!
+    TODO: For V2, this needs to be changed to return game list in different order, instead of a single way.
+    Having that handled by different methods is the way.... this is the way !!!!
     """
     ordered_game_list = map(lambda team: next(
         (game for game in games if game.away_team.id == team or game.home_team.id == team), None),
@@ -74,15 +83,25 @@ def prioritize_pref_series(series, teams):
         Ordered list of preferred series to match the order of their corresponding team and clean the 'None' element
         produced by the'map' function.
     """
-    ordered_series_list = map(lambda team: next(
-        (single_series for single_series in series if single_series.matchupTeams[0].team.id == team or single_series.matchupTeams[1].team.id == team), None),
-                            teams)
+    ordered_series_list = map(
+        lambda team: next(
+            (
+                single_series
+                for single_series in series
+                if single_series.matchupTeams[0].team.id == team
+                or single_series.matchupTeams[1].team.id == team
+            ),
+            None,
+        ),
+        teams,
+    )
     cleaned_series_list = list(filter(None, list(dict.fromkeys(ordered_series_list))))
     return cleaned_series_list
 
 def game_by_schedule(games):
     """
-    By default, the api return the list of games ordered by start time, the first ones to finish will be put at the top. This function just fix make sure the list stay ordred by the start
+    By default, the api return the list of games ordered by start time,
+    the first ones to finish will be put at the top. This function just fix make sure the list stay ordred by the start
     """
 
     return sorted(games, key=lambda x: x.game_date)
@@ -102,7 +121,7 @@ class Data:
 
         # Get lat/long and message (for debug) for dimmer and weather
         self.latlng, self.latlng_msg = get_lat_lng(config.location)
- 
+
         # Test for alerts
         #self.latlng = [32.653,-83.7596]
 
@@ -211,7 +230,7 @@ class Data:
         today = datetime.today()
         noon = datetime.strptime("12:00", "%H:%M").replace(year=today.year, month=today.month,
                                                         day=today.day)
-        #end_of_day = datetime.strptime(self.config.end_of_day, "%H:%M").replace(year=today.year, month=today.month,day=today.day)
+
         end_of_day = datetime.strptime("03:00", "%H:%M").replace(year=today.year, month=today.month,day=today.day)
         if noon < end_of_day < datetime.now() and datetime.now() > noon:
             today += timedelta(days=1)
@@ -244,15 +263,15 @@ class Data:
 
             # Reset flag
             self.all_pref_games_final = False
-            
+
             #Don't think this is needed to be called a second time
-           #self.refresh_daily()           
+           #self.refresh_daily()
             self.status.refresh_next_season()
-           
+
             return True
         else:
             debug.info("It is not a new day")
-                                   
+
             return False
 
     #
@@ -291,7 +310,8 @@ class Data:
             the first game as the main event.
 
             TODO:
-                Add the option to start the earliest game in the preferred game list but change to the top one as soon as it start.
+                Add the option to start the earliest game in the preferred game list
+                but change to the top one as soon as it start.
         """
 
         attempts_remaining = 5
@@ -303,12 +323,12 @@ class Data:
                     self.games = []
                     self.pref_games = []
                     return data
-                
-            
+
+
                 self.games = data["games"]
-                                 
+
                 self.pref_games = filter_list_of_games(self.games, self.pref_teams)
-                            
+
                 # Populate the TeamInfo classes used for the team_summary board
                 for team_id in self.pref_teams:
                     #import pdb; pdb.set_trace()
@@ -319,7 +339,7 @@ class Data:
 
                 if self.config.preferred_teams_only and self.pref_teams:
                     self.games = self.pref_games
-                
+
                 if not self.is_pref_team_offday() and self.config.live_mode:
                     #self.pref_games = prioritize_pref_games(self.pref_games, self.pref_teams)
                     self.check_all_pref_games_final()
@@ -349,11 +369,11 @@ class Data:
         """
             Function that handle the live game.
 
-            Show the earliest game until the most prefered game start. 
-            
+            Show the earliest game until the most prefered game start.
+
             Always show the top team when the other games are final.
-            
-            If a higher game in priority starts, move to that one. 
+
+            If a higher game in priority starts, move to that one.
 
             6:00 Final
             [7:00, *3:00, 7:00, 8:00, 10:00]
@@ -364,7 +384,7 @@ class Data:
 
         if len(self.pref_games) == 0:
             return
-        
+
         self.current_game_id = self.pref_games[0]["id"]
         earliest_start_time = datetime.strptime(self.pref_games[0]["startTimeUTC"], '%Y-%m-%dT%H:%M:%SZ')
         #for g in self.pref_games:
@@ -376,14 +396,24 @@ class Data:
             if not game_obj.is_final:
                 # If the game started.
                 if datetime.strptime(g["startTimeUTC"],'%Y-%m-%dT%H:%M:%SZ') <= datetime.utcnow():
-                    debug.info('Showing highest priority live game. {} vs {}'.format(g["awayTeam"]["name"]["default"], g["homeTeam"]["name"]["default"]))
+                    debug.info(
+                        'Showing highest priority live game. {} vs {}'.format(
+                            g["awayTeam"]["name"]["default"],
+                            g["homeTeam"]["name"]["default"],
+                        )
+                    )
                     self.current_game_id = g["id"]
                     return
                 # If the game has not started but is ealier then the previous set game
                 if datetime.strptime(g["startTimeUTC"], "%Y-%m-%dT%H:%M:%SZ") < earliest_start_time:
                     earliest_start_time = datetime.strptime(g["startTimeUTC"], '%Y-%m-%dT%H:%M:%SZ')
                     self.current_game_id = g["id"]
-                    debug.info('Showing earliest game. {} vs {}'.format(g["awayTeam"]["name"]["default"], g["homeTeam"]["name"]["default"]))
+                    debug.info(
+                        'Showing earliest game. {} vs {}'.format(
+                            g["awayTeam"]["name"]["default"],
+                            g["homeTeam"]["name"]["default"],
+                        )
+                    )
 
     def other_games(self):
         if not self.is_pref_team_offday() and self.config.live_mode:
@@ -396,15 +426,27 @@ class Data:
         return self.games
 
     def check_all_pref_games_final(self):
+        """
+        Check if all preferred team games are finished to control screensaver blocking.
+
+        Handles both single and multi-game scenarios:
+        - Blocks screensaver if ANY preferred game is LIVE, SCHEDULED, or CRITICAL
+        - Allows screensaver only when ALL preferred games are FINAL or OFF
+        """
         for game in self.pref_games:
-            if game["gameState"] != "OFF" or game["gameState"] != "FINAL":
+            # Game is not final if it's not in FINAL or OFF (OFFICIAL_FINAL) state
+            # Using AND because BOTH conditions must be false (i.e., game must be FINAL or OFF)
+            if game["gameState"] != "OFF" and game["gameState"] != "FINAL":
+                # At least one game is still live/scheduled - block screensaver
+                self.all_pref_games_final = False
+                self.screensaver_livegame = True
                 return
 
+        # All games are final - allow screensaver
         self.all_pref_games_final = True
-        #Let the screensaver run again
         self.screensaver_livegame = False
 
-    
+
     # This is the function that will determine the state of the board (Offday, Gameday, Live etc...).
     def get_status(self):
         attempts_remaining = 5
@@ -498,7 +540,8 @@ class Data:
 
     def get_pref_teams_id(self):
         """
-            Finds the preferred teams ID. The type of Team information variate throughout the API except for the team's id.
+            Finds the preferred teams ID.
+            The type of Team information variate throughout the API except for the team's id.
             Working with that will be much easier.
 
         :return: list of the preferred team's ID in order
@@ -526,9 +569,10 @@ class Data:
     def refresh_playoff(self):
         """
             Currently the series ticker request all the games of a series everytime its asked to load on screen.
-            This create a lot of delay between showing each series. 
+            This create a lot of delay between showing each series.
             TODO:
-                Add a refresh function to the Series object instead and trigger a refresh only at specific time in the renderer.(End of a game, new day)
+                Add a refresh function to the Series object instead and trigger a refresh
+                only at specific time in the renderer.(End of a game, new day)
         """
         self.current_round = None
         self.current_round_name = None
@@ -553,7 +597,7 @@ class Data:
                         self.series = []
 
                         # Grab the series of the current round of playoff.
-                        self.series_list = self.current_round["series"]     
+                        self.series_list = self.current_round["series"]
 
                         self.series_list = []
                         for i in self.playoffs.rounds:
@@ -561,9 +605,8 @@ class Data:
                                 self.series_list.append(j)
 
                         # Check if prefered team are part of the current round of playoff
-                        #self.pref_series = prioritize_pref_series(filter_list_of_series(self.series_list, self.pref_teams), self.pref_teams)
                         self.pref_series = self.series_list
-                        
+
                         # If the user as set to show his favorite teams in the seriesticker
                         if self.config.seriesticker_preferred_teams_only and self.pref_series:
                             self.series_list = self.pref_series
@@ -584,11 +627,13 @@ class Data:
                                 if((team1 in teams) or (team2 in teams)):
                                     s.show = False
 
-                        
+
                         self.isPlayoff = True
                     except AttributeError:
-                        debug.error("The {} Season playoff has not started yet or is unavailable".format(self.playoffs.season))
-                        
+                        debug.error(
+                            "The {} Season playoff has not started or is unavailable".format(self.playoffs.season)
+                        )
+
                         self.isPlayoff = False
                         break
                 break
@@ -609,7 +654,8 @@ class Data:
 
     def series_by_conference():
         """
-            TODO:reorganize the list of series by conference and return the list. this is to allow the option of showing the preferred conference series.
+            TODO:reorganize the list of series by conference and return the list.
+            this is to allow the option of showing the preferred conference series.
         """
         pass
 
@@ -641,15 +687,15 @@ class Data:
         debug.info('refreshing daily data')
         self.teams_info = self.get_teams()
         self.teams_info_by_abbrev = self.get_teams_by_code()
-        
+
         # Update standings
         self.refresh_standings()
 
         # Fetch the playoff data
         self.refresh_playoff()
-        
- 
-        
+
+
+
 
     def get_player_stats(self, player_id, season=None):
         """
@@ -673,4 +719,4 @@ class Data:
                 attempts_remaining -= 1
                 sleep(NETWORK_RETRY_SLEEP_TIME)
         return None
-        
+
