@@ -24,4 +24,4 @@ backoff
 bottleneck==1.4.2
 pandas==2.2.3
 env-canada>=0.11.3
-requests>=2.31.0
+httpx==0.28.1

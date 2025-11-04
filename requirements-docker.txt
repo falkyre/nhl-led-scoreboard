@@ -21,4 +21,4 @@ tk
 diskcache
 backoff
 env-canada>=0.11.3
-requests>=2.31.0
+httpx==0.28.1
