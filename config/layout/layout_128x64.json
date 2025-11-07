@@ -78,6 +78,21 @@
       "position": ["50%", 12],
       "align": "center-top"
     },
+    "home_pp_time": {
+      "position": ["75%", "100%"],
+      "align": "center-bottom",
+      "font": "small"
+    },
+    "away_pp_time": {
+      "position": ["25%", "100%"],
+      "align": "center-bottom",
+      "font": "small"
+    },
+    "pp_info": {
+      "position": ["50%", "100%"],
+      "align": "center-bottom",
+      "font": "small"
+    },
     "irregular_status": {
       "position": [0, 2],
       "relative": {

@@ -234,6 +234,10 @@ class Scoreboard(GameSummaryBoard):
         # Parse game situation (power plays, goalie pulled, etc.)
         home_pp = False
         away_pp = False
+        # this really should be stored at the situation level, but because of how we are currently handling penatlies,
+        # we are going to store it with the teams data.
+        home_pp_time_remaining = None
+        away_pp_time_remaining = None
         home_goalie_pulled = False
         away_goalie_pulled = False
 
@@ -244,11 +248,13 @@ class Scoreboard(GameSummaryBoard):
                 if overview["situation"]["homeTeam"].get("situationDescriptions"):
                     if "PP" in overview["situation"]["homeTeam"]["situationDescriptions"]:
                         home_pp = True
+                        home_pp_time_remaining = overview["situation"].get("timeRemaining")
                     if "EN" in overview["situation"]["homeTeam"]["situationDescriptions"]:
                         home_goalie_pulled = True
                 if overview["situation"]["awayTeam"].get("situationDescriptions"):
                     if "PP" in overview["situation"]["awayTeam"]["situationDescriptions"]:
                         away_pp = True
+                        away_pp_time_remaining = overview["situation"].get("timeRemaining")
                     if "EN" in overview["situation"]["awayTeam"]["situationDescriptions"]:
                         away_goalie_pulled = True
         except Exception:
@@ -266,6 +272,7 @@ class Scoreboard(GameSummaryBoard):
             away_team_sog,
             away_penalties,
             away_pp,
+            away_pp_time_remaining,
             away_skaters,
             away_goalie_pulled,
             away_goal_plays
@@ -278,6 +285,7 @@ class Scoreboard(GameSummaryBoard):
             home_team_sog,
             home_penalties,
             home_pp,
+            home_pp_time_remaining,
             home_skaters,
             home_goalie_pulled,
             home_goal_plays

@@ -1,7 +1,9 @@
-from PIL import Image, ImageFont, ImageDraw, ImageSequence
-from utils import center_text, convert_date_format, get_file
-from renderer.logos import LogoRenderer
+from PIL import Image
+
 from data.scoreboard import Scoreboard
+from renderer.logos import LogoRenderer
+from utils import get_file
+
 
 class ScoreboardRenderer:
     def __init__(self, data, matrix, scoreboard: Scoreboard, shot_on_goal=False):
@@ -46,13 +48,13 @@ class ScoreboardRenderer:
 
         self.matrix.draw_rectangle(((display_width/2),0), ((display_width),display_height), (0,0,0))
         self.home_logo_renderer.render()
-        
+
         gradient = Image.open(get_file('assets/images/64x32_scoreboard_center_gradient.png'))
 
         # For 128x64 use the bigger gradient image.
         if display_height == 64:
             gradient = Image.open(get_file('assets/images/128x64_scoreboard_center_gradient.png'))
-        
+
         self.matrix.draw_image((display_width/2,0), gradient, align="center")
 
         if self.scoreboard.is_scheduled:
@@ -75,16 +77,16 @@ class ScoreboardRenderer:
 
         # Draw the text on the Data image.
         self.matrix.draw_text_layout(
-          self.layout.scheduled_date, 
+          self.layout.scheduled_date,
           'TODAY'
         )
         self.matrix.draw_text_layout(
-          self.layout.scheduled_time, 
+          self.layout.scheduled_time,
           start_time
         )
 
         self.matrix.draw_text_layout(
-          self.layout.vs, 
+          self.layout.vs,
           'VS'
         )
 
@@ -96,7 +98,6 @@ class ScoreboardRenderer:
         period = self.scoreboard.periods.ordinal
         clock = self.scoreboard.periods.clock
         score = '{}-{}'.format(self.scoreboard.away_team.goals, self.scoreboard.home_team.goals)
-        
 
         if self.show_SOG:
             self.draw_SOG()
@@ -125,12 +126,11 @@ class ScoreboardRenderer:
     def draw_final(self):
         # Get the Info
         period = self.scoreboard.periods.ordinal
-        result = self.scoreboard.periods.clock
         score = '{}-{}'.format(self.scoreboard.away_team.goals, self.scoreboard.home_team.goals)
 
         # Draw the info
         self.matrix.draw_text_layout(
-            self.layout.center_top, 
+            self.layout.center_top,
             str(self.scoreboard.date)
         )
 
@@ -139,12 +139,12 @@ class ScoreboardRenderer:
             end_text = "F/{}".format(period)
 
         self.matrix.draw_text_layout(
-            self.layout.period_final, 
+            self.layout.period_final,
             end_text
         )
 
         self.matrix.draw_text_layout(
-            self.layout.score, 
+            self.layout.score,
             score
         )
 
@@ -173,6 +173,22 @@ class ScoreboardRenderer:
     def draw_power_play(self):
         away_number_skaters = self.scoreboard.away_team.num_skaters
         home_number_skaters = self.scoreboard.home_team.num_skaters
+
+        home_time = self.scoreboard.home_team.pp_time_remaining or ""
+        away_time = self.scoreboard.away_team.pp_time_remaining or ""
+
+        pp_text = f"{home_time} {home_number_skaters} on {away_time} {away_number_skaters}"
+        if self.scoreboard.home_team.pp_time_remaining:
+            self.matrix.draw_text_layout(
+                self.layout.home_pp_time,
+                pp_text
+            )
+        if self.scoreboard.away_team.pp_time_remaining:
+            self.matrix.draw_text_layout(
+                self.layout.away_pp_time,
+                pp_text
+            )
+
         # yellow = self.matrix.graphics.Color(255, 255, 0)
         yellow = (255, 255, 0)
         # red = self.matrix.graphics.Color(255, 0, 0)
@@ -201,7 +217,7 @@ class ScoreboardRenderer:
 
         # Draw the Shot on goal
         SOG = '{}-{}'.format(self.scoreboard.away_team.shot_on_goal, self.scoreboard.home_team.shot_on_goal)
-        
+
         self.matrix.draw_text_layout(
             self.layout.SOG_label,
             "SHOTS"
