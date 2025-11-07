@@ -1,8 +1,7 @@
-from PIL import Image, ImageFont, ImageDraw, ImageSequence
-from utils import center_text, convert_date_format
-from renderer.matrix import MatrixPixels
 import logging
+
 from nhl_api.info import TeamInfo
+from renderer.matrix import MatrixPixels
 
 debug = logging.getLogger("scoreboard")
 
@@ -29,55 +28,62 @@ class PenaltyRenderer:
         self.layout = data.config.config.layout.get_board_layout('penalty')
         self.sleepEvent = sleepEvent
         self.sleepEvent.clear()
-        
+
         self.team_bg_color = team_colors.color("{}.primary".format(team_id))
         self.team_txt_color = team_colors.color("{}.text".format(team_id))
 
     def render(self):
         debug.debug("rendering goal detail board.")
-        # Show the Scorer information 
+        # Show the Scorer information
         self.matrix.clear()
         self.draw_penalty()
-        
+
 
         self.matrix.render()
         self.sleepEvent.wait(self.rotation_rate)
 
     def draw_penalty(self):
-        
-        self.matrix.draw_text(
-            (1, 1), 
-            "Penalty @ {}".format(self.periodTime), 
-            font=self.font, 
-            fill=(0, 0, 0),
+
+        # self.matrix.draw_text(
+        #     (1, 1),
+        #     "Penalty @ {}".format(self.periodTime),
+        #     font=self.font,
+        #     fill=(0, 0, 0),
+        #     backgroundColor=(255,195,12)
+        # )
+
+        self.matrix.draw_text_layout(
+            self.layout.header,
+            "PENALTY @ {}".format(self.periodTime),
+            fillColor=(0, 0, 0),
             backgroundColor=(255,195,12)
         )
-        
+
         self.matrix.draw_text_layout(
-            self.layout.team_name, 
+            self.layout.team_name,
             self.team.details.abbrev,
             fillColor=(self.team_txt_color['r'], self.team_txt_color['g'], self.team_txt_color['b']),
             backgroundColor=(self.team_bg_color['r'], self.team_bg_color['g'], self.team_bg_color['b'])
         )
-        
+
         self.draw_hashtag()
 
         self.matrix.draw_text_layout(
-            self.layout.jersey_number, 
+            self.layout.jersey_number,
             str(self.player["sweaterNumber"])
         )
 
         self.matrix.draw_text_layout(
-            self.layout.last_name, 
+            self.layout.last_name,
             self.player["lastName"]["default"]
         )
         self.matrix.draw_text_layout(
-            self.layout.minutes, 
+            self.layout.minutes,
             "{}:00".format(self.penaltyMinutes),
         )
         self.matrix.draw_text_layout(
-            self.layout.severity, 
-            self.severity, 
+            self.layout.severity,
+            self.severity,
             fillColor=(255,195,12),
         )
 
@@ -95,7 +101,7 @@ class PenaltyRenderer:
             color = (255, 255, 255)
             pixels.append(
               MatrixPixels(
-                hashtag_dots[dots_coord], 
+                hashtag_dots[dots_coord],
                 color
               )
             )

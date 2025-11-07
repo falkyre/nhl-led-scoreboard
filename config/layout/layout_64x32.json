@@ -152,8 +152,12 @@
     }
   },
   "penalty":{
+    "header": {
+      "position": [1,1],
+      "align":"left"
+    },
     "team_name":{
-      "position": [1, 9]
+      "position": [1, 8]
     },
     "hashtag_dots":{
       "position": [2, 0],
