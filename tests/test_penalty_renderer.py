@@ -229,6 +229,7 @@ def main():
 
     # Create sleep event
     sleepEvent = Event()
+    sleepEvent.wait(3)
 
     # Create and render penalty
     try:
