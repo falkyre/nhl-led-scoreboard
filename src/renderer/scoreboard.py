@@ -122,6 +122,10 @@ class ScoreboardRenderer:
 
         self.matrix.render()
 
+        #fake power play info for testing
+        #self.scoreboard.home_team.powerplay = False
+        #self.scoreboard.away_team.powerplay = True
+
         if self.scoreboard.away_team.powerplay or self.scoreboard.home_team.powerplay:
             debug.debug("Drawing power play info")
             self.draw_power_play()
