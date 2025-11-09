@@ -37,6 +37,9 @@ class ScoreboardConfig:
         # Goal animation
         self.goal_anim_pref_team_only = json["preferences"]["goal_animations"]["pref_team_only"]
 
+        # Penalty animation
+        self.disable_penalty_animation = json["preferences"].get("disable_penalty_animation", False)
+
         #MQTT settings
         #Add in the try/except as this is not a required section in the config
         try:
