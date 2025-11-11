@@ -22,7 +22,7 @@ class ConfigReloadHandler(FileSystemEventHandler):
 
 def start_config_watcher(scoreboard_config, scheduler_manager):
     """
-    Start a watchdog observer thread on config/config.json for changes, 
+    Start a watchdog observer thread on config/config.json for changes,
     calling _reload_config if file is reloaded and validated.
     """
     import os
