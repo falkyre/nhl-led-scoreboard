@@ -5,7 +5,9 @@ from datetime import datetime
 import httpx
 
 from api.weather.wx_utils import degrees_to_direction, dew_point, get_csv, temp_f, usaheatindex, wind_chill, wind_kmph
-from utils import sb_cache
+from utils import get_or_create_cache
+
+sb_cache = get_or_create_cache()
 
 debug = logging.getLogger("scoreboard")
 

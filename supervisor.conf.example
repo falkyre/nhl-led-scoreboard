@@ -1,0 +1,65 @@
+# NHL LED Scoreboard - Supervisor Configuration Example
+#
+# This file provides an example configuration for running the NHL LED Scoreboard
+# as a system service using Supervisor.
+#
+# ============================================================================
+# IMPORTANT: Update paths to match your installation directory and username
+#            (typically '/home/pi/' or '/home/rpi/' on Raspberry Pi OS)
+# ============================================================================
+#
+# Installation:
+#   1. Install supervisor: sudo apt-get install supervisor
+#   2. Copy this file: sudo cp supervisor.conf.example /etc/supervisor/conf.d/nhl-scoreboard.conf
+#   3. Edit the '/etc/supervisor/conf.d/nhl-scoreboard.conf' to match your setup:
+#      - `sudo nano /etc/supervisor/conf.d/nhl-scoreboard.conf`
+#      - Replace '/home/rpi/' paths with your installation directory
+#      - Adjust matrix settings (--led-*) to match your hardware
+#   4. Reload supervisor: sudo supervisorctl reread && sudo supervisorctl update
+#   5. Start the service: sudo supervisorctl start scoreboard
+#
+# Management commands:
+#   sudo supervisorctl status scoreboard      # Check status
+#   sudo supervisorctl start scoreboard       # Start service
+#   sudo supervisorctl stop scoreboard        # Stop service
+#   sudo supervisorctl restart scoreboard     # Restart service
+#   sudo supervisorctl tail scoreboard        # View logs
+
+[program:scoreboard]
+# Command to run - runs as root (required for LED matrix hardware access)
+# Adjust the matrix settings (--led-*) to match your hardware configuration
+# Update /home/rpi/ paths if you installed to a different directory
+command=sudo /home/rpi/nhlsb-venv/bin/python3 ./src/main.py --led-gpio-mapping=adafruit-hat-pwm --led-brightness=60 --led-slowdown-gpio=3 --led-rgb-sequence=rgb --led-rows=64 --led-cols=128 --led-pwm-bits=10 --led-limit-refresh=120 --led-pwm-dither-bits=1
+
+# Working directory - update if you installed elsewhere
+directory=/home/rpi/nhl-led-scoreboard
+
+# The command above will start the scoreboard as root vai sudo(required for LED matrix GPIO access)
+# The scoreboard then drops privileges to the calling user set here
+# This should be the user you login to your Pi with and setup the scorebaord with (usually 'rpi' or 'pi')
+user=rpi
+
+# Auto-start on system boot
+autostart=true
+
+# Auto-restart if process crashes
+autorestart=true
+
+# Don't restart too quickly if it keeps failing
+startretries=3
+startsecs=5
+
+# Logging configuration
+stdout_logfile=/var/log/supervisor/nhl-scoreboard.log
+stdout_logfile_maxbytes=10MB
+stdout_logfile_backups=5
+stderr_logfile=/var/log/supervisor/nhl-scoreboard-error.log
+stderr_logfile_maxbytes=10MB
+stderr_logfile_backups=5
+
+# Process priority (lower number = higher priority)
+priority=999
+
+# Kill process gracefully (SIGTERM) before forcing (SIGKILL)
+stopwaitsecs=10
+stopsignal=TERM
