@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 
@@ -84,3 +83,54 @@ class SchedulerManager:
                 sb_logger.error(f"MQTT (paho-mqtt): is disabled.  Unable to import module: {e}  Did you install paho-mqtt?")  # noqa: E501
 
         sb_logger.info("Jobs scheduled.")
+
+    def add_job(self, func, trigger, **kwargs):
+        """
+        Adds a new job to the scheduler.
+
+        Parameters:
+            func (callable): The function to schedule.
+            trigger (str): The type of trigger (e.g., 'interval', 'cron', etc.).
+            kwargs: Any other arguments accepted by the scheduler's add_job.
+        Returns:
+            job: The scheduled job object.
+        """
+        sb_logger.info(f"Adding job: {func} with trigger: {trigger}, args: {kwargs}")
+        try:
+            job = self.data.scheduler.add_job(func, trigger, **kwargs)
+            sb_logger.info(f"Job added: {job}")
+            return job
+        except Exception as e:
+            sb_logger.error(f"Failed to add job: {e}")
+            return None
+
+    def pause_job(self, job_id):
+        """
+        Pauses a job by its job_id.
+        
+        Parameters:
+            job_id (str): The job id to pause.
+        Returns:
+            bool: True if paused, False if failed.
+        """
+        sb_logger.info(f"Pausing job: {job_id}")
+        try:
+            self.data.scheduler.pause_job(job_id)
+            sb_logger.info(f"Job {job_id} paused.")
+            return True
+        except Exception as e:
+            sb_logger.error(f"Could not pause job {job_id}: {e}")
+            return False
+
+    def pause_all_jobs(self):
+        """
+        Pauses all scheduled jobs.
+        """
+        sb_logger.info("Pausing all jobs.")
+        try:
+            self.data.scheduler.pause()
+            sb_logger.info("All jobs have been paused.")
+            return True
+        except Exception as e:
+            sb_logger.error(f"Could not pause all jobs: {e}")
+            return False
