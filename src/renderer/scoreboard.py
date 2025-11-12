@@ -18,6 +18,7 @@ class ScoreboardRenderer:
         self.scoreboard = scoreboard
         self.matrix = matrix
         self.show_SOG = shot_on_goal
+        self.show_power_play_details = data.config.show_power_play_details
 
         self.home_logo_renderer = LogoRenderer(
             self.matrix,
@@ -127,8 +128,12 @@ class ScoreboardRenderer:
         #self.scoreboard.away_team.powerplay = True
 
         if self.scoreboard.away_team.powerplay or self.scoreboard.home_team.powerplay:
-            debug.debug("Drawing power play info")
-            self.draw_power_play()
+            if self.show_power_play_details:
+                debug.debug("Drawing power play details")
+                self.draw_power_play_details()
+            else:
+                debug.debug("Drawing power play indicators")
+                self.draw_power_play_indicators()
 
 
     def draw_final(self):
@@ -178,7 +183,7 @@ class ScoreboardRenderer:
         )
         self.matrix.render()
 
-    def draw_power_play(self):
+    def draw_power_play_details(self):
         # Get the Info - power play time remaining and skater counts
         pp_time = self.scoreboard.home_team.pp_time_remaining or self.scoreboard.away_team.pp_time_remaining or "1:23"
         max_skaters = max(self.scoreboard.home_team.num_skaters, self.scoreboard.away_team.num_skaters)
@@ -225,6 +230,41 @@ class ScoreboardRenderer:
                 fillColor=(text_color['r'], text_color['g'], text_color['b'])
             )
 
+        self.matrix.render()
+
+    def draw_power_play_indicators(self):
+        away_number_skaters = self.scoreboard.away_team.num_skaters
+        home_number_skaters = self.scoreboard.home_team.num_skaters
+
+        yellow = (255, 255, 0)
+        red = (255, 0, 0)
+        green = (0, 255, 0)
+        colors = {"6": green, "5": green, "4": yellow, "3": red}
+
+        self.matrix.draw.line(
+            (0, self.matrix.height - 1, 3, self.matrix.height - 1),
+            fill=colors[str(away_number_skaters)],
+        )
+        self.matrix.draw.line(
+            (0, self.matrix.height - 2, 1, self.matrix.height - 2),
+            fill=colors[str(away_number_skaters)],
+        )
+        self.matrix.draw.line(
+            (0, self.matrix.height - 3, 0, self.matrix.height - 3),
+            fill=colors[str(away_number_skaters)],
+        )
+        self.matrix.draw.line(
+            (self.matrix.width - 1, self.matrix.height - 1, self.matrix.width - 4, self.matrix.height - 1),
+            fill=colors[str(home_number_skaters)],
+        )
+        self.matrix.draw.line(
+            (self.matrix.width - 1, self.matrix.height - 2, self.matrix.width - 2, self.matrix.height - 2),
+            fill=colors[str(home_number_skaters)],
+        )
+        self.matrix.draw.line(
+            (self.matrix.width - 1, self.matrix.height - 3, self.matrix.width - 1, self.matrix.height - 3),
+            fill=colors[str(home_number_skaters)],
+        )
         self.matrix.render()
 
     def draw_SOG(self):

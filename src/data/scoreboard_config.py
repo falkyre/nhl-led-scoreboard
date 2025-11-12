@@ -40,6 +40,9 @@ class ScoreboardConfig:
         # Penalty animation
         self.disable_penalty_animation = json["preferences"].get("disable_penalty_animation", False)
 
+        # Show power play details on live game scoreboard
+        self.show_power_play_details = json["preferences"].get("show_power_play_details", False)
+
         #MQTT settings
         #Add in the try/except as this is not a required section in the config
         try:
