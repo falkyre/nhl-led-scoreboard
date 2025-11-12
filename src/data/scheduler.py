@@ -82,6 +82,12 @@ class SchedulerManager:
             except ImportError as e:
                 sb_logger.error(f"MQTT (paho-mqtt): is disabled.  Unable to import module: {e}  Did you install paho-mqtt?")  # noqa: E501
 
+        # Log the list of scheduled jobs at debug level
+        try:
+            sb_logger.debug(f"Scheduled jobs: {self.list_jobs()}")
+        except Exception as e:
+            sb_logger.debug(f"Scheduled jobs: (unable to list jobs: {e})")
+
         sb_logger.info("Jobs scheduled.")
 
     def add_job(self, func, trigger, **kwargs):
@@ -134,3 +140,39 @@ class SchedulerManager:
         except Exception as e:
             sb_logger.error(f"Could not pause all jobs: {e}")
             return False
+
+    def list_jobs(self):
+        """
+        Return a list of scheduled jobs with basic metadata.
+
+        The returned value is a list of dicts:
+          - id: job id (if available)
+          - next_run_time: next scheduled run time (if available)
+          - trigger: trigger description / object (if available)
+
+        This method is defensive: if the scheduler doesn't expose get_jobs()
+        it will attempt common alternatives and always return a list.
+        """
+        try:
+            # APScheduler provides get_jobs()
+            if hasattr(self.data.scheduler, "get_jobs"):
+                jobs = self.data.scheduler.get_jobs()
+            # Some schedulers might expose jobs property
+            elif hasattr(self.data.scheduler, "jobs"):
+                jobs = getattr(self.data.scheduler, "jobs")
+            else:
+                sb_logger.debug("Scheduler does not provide job enumeration API.")
+                return []
+
+            job_list = []
+            for job in jobs:
+                job_list.append({
+                    "id": getattr(job, "id", None),
+                    "name": getattr(job, "name", None),
+                    "next_run_time": getattr(job, "next_run_time", None),
+                    "trigger": getattr(job, "trigger", None),
+                })
+            return job_list
+        except Exception as e:
+            sb_logger.error(f"Unable to list jobs: {e}")
+            return []
