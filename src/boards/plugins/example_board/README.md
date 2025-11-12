@@ -112,9 +112,7 @@ __Example:__
     "python_dependencies": []
   },
 
-  "preserve_files": [
-    "config.json"
-  ]
+  "preserve_files": []
 }
 ```
 
@@ -129,7 +127,7 @@ __Example:__
 | `enabled` | Boolean | No | Whether plugin is enabled (default: true). Set to false to disable without uninstalling. |
 | `boards` | Array | Yes | List of board classes this plugin provides (see below). |
 | `requirements` | Object | No | Version and dependency requirements (see below). |
-| `preserve_files` | Array | No | Files to preserve during updates/removal (default: config.json, *.csv, data/*, custom_*). |
+| `preserve_files` | Array | No | Additional files to preserve during updates/removal. Always includes defaults: config.json, *.csv, data/*, custom_*. |
 
 #### boards Array
 
@@ -420,9 +418,7 @@ cd my_custom_board
     "python_dependencies": []
   },
 
-  "preserve_files": [
-    "config.json"
-  ]
+  "preserve_files": []
 }
 ```
 
@@ -522,18 +518,26 @@ Specify minimum versions if you use newer features:
 
 ### File Preservation
 
-Specify files to preserve during updates:
+Specify __additional__ files to preserve during updates. The plugin manager always preserves these default patterns:
+
+- `config.json` - Plugin configuration
+- `*.csv` - CSV data files
+- `data/*` - All files in data directory
+- `custom_*` - Custom user files
+
+Add plugin-specific patterns to preserve additional files:
 
 ```json
 {
   "preserve_files": [
-    "config.json",
-    "custom_data.csv",
-    "data/*.json",
-    "user_*"
+    "*.db",           // Database files
+    "cache/*.json",   // Cached data
+    "user_settings/*" // User settings directory
   ]
 }
 ```
+
+__Note:__ You don't need to include the default patterns - they're always preserved automatically. Only specify additional files unique to your plugin.
 
 Supports glob patterns for flexible matching.
 

@@ -20,6 +20,9 @@ python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git
 # Remove a plugin but keep your configuration
 python plugins.py rm nfl_board --keep-config
 
+# Clean up cache files and fix permissions (usually automatic)
+python plugins.py cleanup
+
 # Enable verbose logging for troubleshooting
 python plugins.py --verbose sync
 ```
@@ -122,6 +125,29 @@ python plugins.py rm nfl_board
 - Removes the plugin from `plugins.json`
 - Deletes the plugin directory
 - If `--keep-config` is used: Preserves your configuration files in the plugin directory
+
+### `cleanup` - Clean Cache and Fix Permissions
+
+Clean up Python cache files and fix root-owned file permissions. **This runs automatically before `add` and `sync` commands**, so you typically don't need to run it manually.
+
+```bash
+# Manual cleanup (rarely needed)
+python plugins.py cleanup
+```
+
+**What it does:**
+
+- Removes `__pycache__` directories (including root-owned ones)
+- Cleans up `/tmp/sb_cache` if owned by root
+- Fixes ownership of root-owned files to your user account
+
+**When to use manually:**
+
+- If plugin updates are failing due to permission errors
+- After running the scoreboard with `sudo` and encountering file permission issues
+- When troubleshooting plugin installation problems
+
+> **Note:** This functionality replaces the need to run `scripts/sbtools/sb-cleanup-cache` separately. The plugin manager now handles cache cleanup automatically!
 
 ## User File Preservation
 
@@ -274,15 +300,26 @@ sudo systemctl restart nhl-scoreboard
 
 If `python plugins.py sync` fails to update a plugin:
 
-1. **Check your internet connection**
-2. **Try with verbose logging to see detailed errors:**
+1. **Try cleaning cache and permissions first:**
+
+   ```bash
+   python plugins.py cleanup
+   python plugins.py sync
+   ```
+
+   The plugin manager runs cleanup automatically, but running it manually with verbose output can help diagnose issues.
+
+2. **Check your internet connection**
+
+3. **Try with verbose logging to see detailed errors:**
 
    ```bash
    python plugins.py --verbose sync
    ```
 
-3. **Verify the git repository URL is correct** in `plugins.json`
-4. **Check if the repository is accessible** (try opening the GitHub URL in a browser)
+4. **Verify the git repository URL is correct** in `plugins.json`
+
+5. **Check if the repository is accessible** (try opening the GitHub URL in a browser)
 
 The plugin manager automatically restores the previous version if an update fails, so your installation is safe.
 

@@ -18,7 +18,5 @@
     "python_dependencies": []
   },
 
-  "preserve_files": [
-    "config.json"
-  ]
+  "preserve_files": []
 }
