@@ -13,7 +13,7 @@ from rich.traceback import install
 
 import debug
 import driver
-from data.config_watcher import start_config_watcher
+from data.config_watcher import start_config_watcher, start_plugin_config_watcher
 from data.data import Data
 from data.scheduler import SchedulerManager
 from data.scoreboard_config import ScoreboardConfig
@@ -121,14 +121,15 @@ def run():
     scheduler.add_listener(scheduler_event_listener, EVENT_JOB_MISSED | EVENT_JOB_ERROR)
     scheduler.start()
 
-    # Add APScheduler to data object so it's accessible throughout the applicatoion
+    # Add APScheduler to data object so it's accessible throughout the application
     data.scheduler = scheduler
 
     # Any tasks that are scheduled go below this line
     scheduler_manager = SchedulerManager(data, matrix, sleepEvent)
+    data.scheduler_manager = scheduler_manager  # Make scheduler_manager accessible to boards
     scheduler_manager.schedule_jobs()
 
-    observer, watcher_thread = start_config_watcher(config, scheduler_manager)
+    observer, watcher_thread, config_handler = start_config_watcher(config, scheduler_manager)
     sb_logger.info("ScoreboardConfig loaded; watcher active for config/config.json changes.")
 
     # If the driver is running on actual hardware, these files contain libs that should be installed.
@@ -163,7 +164,18 @@ def run():
             sbmqttThread.daemon = True
             sbmqttThread.start()
 
-    MainRenderer(matrix, data, sleepEvent,sbQueue).render()
+    # Create the MainRenderer and register it with the config watcher for board sync
+    main_renderer = MainRenderer(matrix, data, sleepEvent, sbQueue)
+    config_handler.set_main_renderer(main_renderer)
+
+    # Start plugin config watcher to detect changes to plugin/builtin configs
+    plugin_observer, plugin_thread, plugin_handler = start_plugin_config_watcher(
+        main_renderer.boards.board_manager
+    )
+    sb_logger.info("Plugin config watcher active for board config changes.")
+
+    # Start the render loop
+    main_renderer.render()
 
 
 if __name__ == "__main__":
