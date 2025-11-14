@@ -24,6 +24,9 @@ class ConfigReloadHandler(FileSystemEventHandler):
 
             # Sync boards with new config if renderer is available
             if self.main_renderer:
+                # Clear all boards to ensure they reinitialize with new config
+                self.main_renderer.boards.board_manager.clear_all_boards()
+                debug.info("ConfigReloadHandler: Cleared all boards for config reload")
                 self.main_renderer.sync_boards_with_config()
 
     def set_main_renderer(self, main_renderer):
