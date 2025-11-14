@@ -46,25 +46,22 @@ class PluginConfigHandler(FileSystemEventHandler):
         super().__init__()
         self.board_manager = board_manager
 
-    def on_modified(self, event):
+    def _handle_config_change(self, event):
         # Only react to config.json files in plugin/builtin directories
         if event.is_directory or not event.src_path.endswith('config.json'):
             return
 
-        # Extract board_id from path: src/boards/plugins/nfl_board/config.json -> nfl_board
+        # Extract board_id from path
+        # For /path/to/nfl_board/config.json -> board_id is 'nfl_board' (parent dir name)
         try:
-            path_parts = event.src_path.split(os.sep)
-            # Find 'plugins' or 'builtins' in path
-            if 'plugins' in path_parts:
-                idx = path_parts.index('plugins')
-                board_id = path_parts[idx + 1]
-            elif 'builtins' in path_parts:
-                idx = path_parts.index('builtins')
-                board_id = path_parts[idx + 1]
-            else:
-                return  # Not a plugin/builtin config
+            src_path = event.src_path
+            debug.debug(f"PluginConfigHandler: Detected modification to {src_path}")
 
-            debug.info(f"Plugin config changed: {board_id} ({event.src_path})")
+            # Get the directory name containing config.json (this is the board_id)
+            board_dir = os.path.dirname(src_path)
+            board_id = os.path.basename(board_dir)
+
+            debug.info(f"Plugin config changed: {board_id} ({src_path})")
 
             # Cleanup the board - next render will reinitialize with new config
             if board_id in self.board_manager.get_initialized_boards():
@@ -74,7 +71,15 @@ class PluginConfigHandler(FileSystemEventHandler):
                 debug.debug(f"Board '{board_id}' not initialized, no action needed")
 
         except Exception as e:
-            debug.error(f"Error handling plugin config change for {event.src_path}: {e}")
+            debug.error(f"Error handling plugin config change for {event.src_path}: {e}", exc_info=True)
+
+    def on_modified(self, event):
+        """Handle file modification events."""
+        self._handle_config_change(event)
+
+    def on_created(self, event):
+        """Handle file creation events (for editors that create new files)."""
+        self._handle_config_change(event)
 
 def start_plugin_config_watcher(board_manager, boards_base_dir='src/boards'):
     """
@@ -96,13 +101,32 @@ def start_plugin_config_watcher(board_manager, boards_base_dir='src/boards'):
     plugins_dir = os.path.join(boards_base_dir, 'plugins')
     builtins_dir = os.path.join(boards_base_dir, 'builtins')
 
+    # Watch plugins directory - follow symlinks for development setups
     if os.path.exists(plugins_dir):
-        observer.schedule(event_handler, path=plugins_dir, recursive=True)
-        debug.info(f"Started watchdog for plugin configs: {plugins_dir}")
+        # Resolve symlinks and watch actual directories
+        for item in os.listdir(plugins_dir):
+            item_path = os.path.join(plugins_dir, item)
+            # Resolve symlink to actual path
+            real_path = os.path.realpath(item_path)
+            if os.path.isdir(real_path):
+                observer.schedule(event_handler, path=real_path, recursive=True)
+                if item_path != real_path:
+                    debug.info(f"Started watchdog for plugin '{item}': {real_path} (symlinked from {item_path})")
+                else:
+                    debug.info(f"Started watchdog for plugin '{item}': {real_path}")
 
+    # Watch builtins directory - follow symlinks for development setups
     if os.path.exists(builtins_dir):
-        observer.schedule(event_handler, path=builtins_dir, recursive=True)
-        debug.info(f"Started watchdog for builtin configs: {builtins_dir}")
+        for item in os.listdir(builtins_dir):
+            item_path = os.path.join(builtins_dir, item)
+            # Resolve symlink to actual path
+            real_path = os.path.realpath(item_path)
+            if os.path.isdir(real_path):
+                observer.schedule(event_handler, path=real_path, recursive=True)
+                if item_path != real_path:
+                    debug.info(f"Started watchdog for builtin '{item}': {real_path} (symlinked from {item_path})")
+                else:
+                    debug.info(f"Started watchdog for builtin '{item}': {real_path}")
 
     thread = threading.Thread(target=observer.start, daemon=True)
     thread.start()
