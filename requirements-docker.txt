@@ -13,7 +13,7 @@ APScheduler
 lastversion>=1.1.6
 nameparser>=1.0.6
 iso6709
-paho-mqtt
+paho-mqtt>=2.1.0
 rich
 richcolorlog==1.44.12
 RGBMatrixEmulator
