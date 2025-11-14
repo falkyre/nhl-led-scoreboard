@@ -30,10 +30,21 @@ class MainRenderer:
         self.sog_display_frequency = data.config.sog_display_frequency
         self.alternate_data_counter = 1
 
-        # Pre-initialize boards that require early data fetching
-        # This allows boards to start background data processes
-        # before the render loop begins, ensuring data is available on first render
-        self.boards.initialize_boards_with_data_requirements(data, matrix, sleepEvent)
+    def sync_boards_with_config(self):
+        """
+        Synchronize the board manager with current config state.
+
+        This should be called after config reloads to ensure boards that
+        are no longer in any state list are cleaned up.
+        """
+        config_board_lists = [
+            self.data.config.boards_off_day,
+            self.data.config.boards_scheduled,
+            self.data.config.boards_intermission,
+            self.data.config.boards_post_game,
+        ]
+        self.boards.board_manager.sync_with_config(config_board_lists)
+        debug.info("MainRenderer: Synced boards with config")
 
     def render(self):
 

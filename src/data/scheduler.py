@@ -377,6 +377,27 @@ class SchedulerManager:
             sb_logger.error(f"Failed to add job: {e}")
             return None
 
+    def remove_job(self, job_id):
+        """
+        Removes a job from the scheduler by its job_id.
+
+        This is useful for boards that schedule background jobs and need to
+        clean them up when the board is unloaded.
+
+        Parameters:
+            job_id (str): The job id to remove.
+        Returns:
+            bool: True if removed, False if failed.
+        """
+        sb_logger.info(f"Removing job: {job_id}")
+        try:
+            self.data.scheduler.remove_job(job_id)
+            sb_logger.info(f"Job {job_id} removed.")
+            return True
+        except Exception as e:
+            sb_logger.error(f"Could not remove job {job_id}: {e}")
+            return False
+
     def pause_job(self, job_id):
         """
         Pauses a job by its job_id.
@@ -393,6 +414,24 @@ class SchedulerManager:
             return True
         except Exception as e:
             sb_logger.error(f"Could not pause job {job_id}: {e}")
+            return False
+
+    def resume_job(self, job_id):
+        """
+        Resumes a paused job by its job_id.
+
+        Parameters:
+            job_id (str): The job id to resume.
+        Returns:
+            bool: True if resumed, False if failed.
+        """
+        sb_logger.info(f"Resuming job: {job_id}")
+        try:
+            self.data.scheduler.resume_job(job_id)
+            sb_logger.info(f"Job {job_id} resumed.")
+            return True
+        except Exception as e:
+            sb_logger.error(f"Could not resume job {job_id}: {e}")
             return False
 
     def pause_all_jobs(self):
