@@ -20,6 +20,7 @@ from data.scoreboard_config import ScoreboardConfig
 from renderer.loading_screen import Loading
 from renderer.main import MainRenderer
 from renderer.matrix import Matrix
+from thread_manager import ThreadManager
 from utils import args, led_matrix_options, sb_cache, scheduler_event_listener, stop_splash_service
 
 install(show_locals=True)
@@ -128,43 +129,15 @@ def run():
     scheduler_manager = SchedulerManager(data, matrix, sleepEvent)
     screensaver = scheduler_manager.schedule_jobs()
 
-    observer, watcher_thread, config_handler = start_config_watcher(config, scheduler_manager)
-    sb_logger.info("ScoreboardConfig loaded; watcher active for config/config.json changes.")
-
-    if driver.is_hardware():
-        from sbio.pushbutton import PushButton
-        from sbio.motionsensor import Motion
-        
-        if data.config.screensaver_motionsensor:
-            motionsensor = Motion(data,matrix,sleepEvent,scheduler,screensaver)
-            motionsensorThread = threading.Thread(target=motionsensor.run, args=())
-            motionsensorThread.daemon = True
-            motionsensorThread.start()
-
-        if data.config.pushbutton_enabled:
-            pushbutton = PushButton(data,matrix,sleepEvent)
-            pushbuttonThread = threading.Thread(target=pushbutton.run, args=())
-            pushbuttonThread.daemon = True
-            pushbuttonThread.start()
-
-    mqtt_enabled = data.config.mqtt_enabled
     # Create a queue for scoreboard events and info to be sent to an MQTT broker
     sbQueue = queue.Queue()
-    pahoAvail = False
-    if mqtt_enabled:
-        # Only import if we are actually using mqtt, that way paho_mqtt doesn't need to be installed
-        try:
-            from sbio.sbMQTT import sbMQTT
-            pahoAvail = True
-        except Exception as e:
-            sb_logger.error("MQTT (paho-mqtt): is disabled.  Unable to import module: {}  Did you install paho-mqtt?".format(e))  # noqa: E501
-            pahoAvail = False
 
-        if pahoAvail:
-            sbmqtt = sbMQTT(data,matrix,sleepEvent,sbQueue,screensaver)
-            sbmqttThread = threading.Thread(target=sbmqtt.run, args=())
-            sbmqttThread.daemon = True
-            sbmqttThread.start()
+    # Create the ThreadManager
+    thread_manager = ThreadManager(data, matrix, sleepEvent, sbQueue, screensaver)
+    thread_manager.update_threads()
+
+    observer, watcher_thread, config_handler = start_config_watcher(config, scheduler_manager, thread_manager)
+    sb_logger.info("ScoreboardConfig loaded; watcher active for config/config.json changes.")
 
     # Create the MainRenderer and register it with the config watcher for board sync
     main_renderer = MainRenderer(matrix, data, sleepEvent, sbQueue)

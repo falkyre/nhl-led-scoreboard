@@ -8,10 +8,11 @@ from watchdog.observers import Observer
 debug = logging.getLogger("scoreboard")
 
 class ConfigReloadHandler(FileSystemEventHandler):
-    def __init__(self, scoreboard_config, scheduler_manager, main_renderer=None):
+    def __init__(self, scoreboard_config, scheduler_manager, thread_manager=None, main_renderer=None):
         super().__init__()
         self.scoreboard_config = scoreboard_config
         self.scheduler_manager = scheduler_manager
+        self.thread_manager = thread_manager
         self.main_renderer = main_renderer
 
     def on_modified(self, event):
@@ -21,6 +22,9 @@ class ConfigReloadHandler(FileSystemEventHandler):
             debug.info(f"Detected change in {event.src_path}, attempting to reload config...")
             self.scoreboard_config._reload_config()
             self.scheduler_manager.schedule_jobs()
+
+            if self.thread_manager:
+                self.thread_manager.update_threads()
 
             # Sync boards with new config if renderer is available
             if self.main_renderer:
@@ -133,7 +137,7 @@ def start_plugin_config_watcher(board_manager, boards_base_dir='src/boards'):
 
     return observer, thread, event_handler
 
-def start_config_watcher(scoreboard_config, scheduler_manager, main_renderer=None):
+def start_config_watcher(scoreboard_config, scheduler_manager, thread_manager=None, main_renderer=None):
     """
     Start a watchdog observer thread on config/config.json for changes,
     calling _reload_config if file is reloaded and validated.
@@ -141,6 +145,7 @@ def start_config_watcher(scoreboard_config, scheduler_manager, main_renderer=Non
     Args:
         scoreboard_config: The ScoreboardConfig instance
         scheduler_manager: The SchedulerManager instance
+        thread_manager: The ThreadManager instance
         main_renderer: Optional MainRenderer instance for board sync
 
     Returns:
@@ -148,7 +153,7 @@ def start_config_watcher(scoreboard_config, scheduler_manager, main_renderer=Non
     """
     config_path = scoreboard_config.config_file_path
     config_dir = os.path.dirname(config_path)
-    event_handler = ConfigReloadHandler(scoreboard_config, scheduler_manager, main_renderer)
+    event_handler = ConfigReloadHandler(scoreboard_config, scheduler_manager, thread_manager, main_renderer)
     observer = Observer()
     observer.schedule(event_handler, path=config_dir, recursive=False)
     thread = threading.Thread(target=observer.start, daemon=True)
