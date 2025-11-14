@@ -116,7 +116,7 @@ def run():
     # Will also allow for weather alert to interrupt display board if you want
     sleepEvent = threading.Event()
 
-    # Start task scheduler, used for UpdateChecker and screensaver, forecast, dimmer and weather
+    # Start task scheduler, used for UpdateChecker and screensaver, forecast, dimmer and weather and board plugins
     scheduler = BackgroundScheduler(timezone=str(tzlocal.get_localzone()), job_defaults={'misfire_grace_time': None})
     scheduler.add_listener(scheduler_event_listener, EVENT_JOB_MISSED | EVENT_JOB_ERROR)
     scheduler.start()
@@ -126,17 +126,20 @@ def run():
 
     # Any tasks that are scheduled go below this line
     scheduler_manager = SchedulerManager(data, matrix, sleepEvent)
-    scheduler_manager.schedule_jobs()
+    screensaver = scheduler_manager.schedule_jobs()
 
     observer, watcher_thread = start_config_watcher(config, scheduler_manager)
     sb_logger.info("ScoreboardConfig loaded; watcher active for config/config.json changes.")
 
-    # If the driver is running on actual hardware, these files contain libs that should be installed.
-    # For other platforms, they probably don't exist and will crash.
-    screensaver = None
-
     if driver.is_hardware():
         from sbio.pushbutton import PushButton
+        from sbio.motionsensor import Motion
+        
+        if data.config.screensaver_motionsensor:
+            motionsensor = Motion(data,matrix,sleepEvent,scheduler,screensaver)
+            motionsensorThread = threading.Thread(target=motionsensor.run, args=())
+            motionsensorThread.daemon = True
+            motionsensorThread.start()
 
         if data.config.pushbutton_enabled:
             pushbutton = PushButton(data,matrix,sleepEvent)
