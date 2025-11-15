@@ -1,6 +1,6 @@
 # Plugin Manager
 
-Simple plugin manager for board plugins. Each plugin is a separate git repository that gets cloned into `src/boards/plugins/`.
+The plugin manager (`plugins.py`) makes it easy to install, update, and manage board plugins for the NHL LED Scoreboard. Each plugin is a separate git repository that gets cloned into `src/boards/plugins/`.
 
 ## Quick Start
 
@@ -8,124 +8,326 @@ Simple plugin manager for board plugins. Each plugin is a separate git repositor
 # First time setup: copy the example configuration
 cp plugins.json.example plugins.json
 
-# List installed plugins
-python plugins.py list
-
-# Install all plugins from your configuration
+# Install all configured plugins
 python plugins.py sync
 
-# Add a new plugin - plugin name is auto-detected from __plugin_id__
-python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git --ref v1.2.0
+# List installed plugins (shows version, status, commit)
+python plugins.py list
 
-# Add with custom name override (advanced)
-python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git --name wvu_score
+# Add a new plugin
+python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git
 
-# Remove a plugin (preserves user files if --keep-config is used)
+# Remove a plugin but keep your configuration
 python plugins.py rm nfl_board --keep-config
 
-# Enable verbose logging
+# Enable verbose logging for troubleshooting
 python plugins.py --verbose sync
 ```
 
 ## Configuration Files
 
 - **`plugins.json.example`** - Template with recommended plugins
-- **`plugins.json`** - Your customized plugin list
-- **`plugins.lock.json`** - Auto-generated lock file with exact commit SHAs
+- **`plugins.json`** - Your customized plugin list (you edit this)
+- **`plugins.lock.json`** - Auto-generated lock file with exact commit SHAs (tracks what's installed)
+
+## Commands
+
+### `list` - Show Installed Plugins
+
+List all configured plugins with their current version, status, and git commit SHA.
+
+```bash
+python plugins.py list
+```
+
+**Example output:**
+
+```text
+NAME                 VERSION      STATUS       COMMIT
+---------------------------------------------------------
+nfl_board            2025.11.02   present      a1b2c3d
+holiday_countdown    2025.x.x     present      e4f5g6h
+example_board        1.0.0        present      i7j8k9l
+```
+
+This shows:
+
+- **VERSION** - Plugin version from `plugin.json`
+- **STATUS** - Whether plugin files are present or missing
+- **COMMIT** - Git commit SHA (first 7 characters)
+
+### `sync` - Install/Update All Plugins
+
+Install or update all plugins defined in `plugins.json`. **This is the main command you'll use regularly.**
+
+```bash
+python plugins.py sync
+```
+
+**What it does:**
+
+- Installs any plugins that aren't present
+- Updates existing plugins to the latest version from main branch
+- Preserves your configuration files automatically (see User File Preservation)
+- Updates `plugins.lock.json` with exact commit SHAs for reproducibility
+
+**When to use:** Run this after editing `plugins.json` or when you want to update plugins to their latest versions.
+
+### `add` - Install a New Plugin
+
+Add and install a plugin from a git repository. The plugin manager auto-detects the plugin name from the repository's `plugin.json` file.
+
+```bash
+# Most common: Install latest version from main branch
+python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git
+```
+
+This automatically:
+
+1. Clones the repository
+2. Detects the plugin name from `plugin.json`
+3. Installs the plugin files
+4. Adds an entry to your `plugins.json`
+5. Updates `plugins.lock.json` with the commit SHA
+
+**Advanced options** (rarely needed):
+
+```bash
+# Install a specific version/tag (for testing or compatibility)
+python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git --ref v1.2.0
+
+# Install from a development branch (for beta testing)
+python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git --ref develop
+
+# Override the detected plugin name (very rare)
+python plugins.py add https://github.com/kas21/nls-plugin-nfl_board.git --name custom_name
+```
+
+> **Note:** Most users should use the simple `add` command without `--ref`. The `--ref` option is mainly for developers testing specific versions or beta branches.
+
+### `rm` - Remove a Plugin
+
+Remove a plugin from your installation. **Recommended: Always use `--keep-config` to preserve your settings.**
+
+```bash
+# Remove plugin but keep your config files (RECOMMENDED)
+python plugins.py rm nfl_board --keep-config
+
+# Remove plugin completely including config (rarely needed)
+python plugins.py rm nfl_board
+```
+
+**What it does:**
+
+- Removes the plugin from `plugins.json`
+- Deletes the plugin directory
+- If `--keep-config` is used: Preserves your configuration files in the plugin directory
 
 ## User File Preservation
 
-The plugin manager automatically preserves user-modified files during updates and removals. This includes:
+The plugin manager automatically preserves your customized files during updates and removals to prevent data loss. **You don't need to do anything special - it just works!**
 
-### Default Preserved Patterns
-If a plugin doesn't specify `__preserve_files__`, these patterns are preserved by default:
-- `config.json`
-- `*.csv`
-- `data/*`
-- `custom_*`
+### What Gets Preserved
 
-### Custom Preservation (Plugin Authors)
-Plugin authors can specify custom files to preserve in their `__init__.py`:
+By default, these files are automatically preserved:
 
-```python
-# In your plugin's __init__.py
-__preserve_files__ = [
-    "config.json",
-    "custom_holidays.csv",
-    "data/*.json",
-    "user_settings.txt"
-]
-```
+- `config.json` - Your plugin configuration
+- `*.csv` - Any CSV data files
+- `data/*` - All files in the data directory
+- `custom_*` - Any files starting with "custom_"
+
+Plugins can specify additional files to preserve in their `plugin.json` (see the [plugin development guide](src/boards/plugins/example_board/README.md) for details).
 
 ### How It Works
-- **On update** (`sync` or `add`): User files are backed up, plugin is updated, then user files are restored
-- **On removal** (`rm --keep-config`): Specified files are preserved in the plugin directory after removal
-- Supports glob patterns for flexible file matching
-- Works recursively in subdirectories (e.g., `data/*`)
 
-### Examples
+**During updates** (`sync` or `add`):
+
+1. Your files are backed up
+2. Plugin is updated to the new version
+3. Your files are restored automatically
+
+**During removal** (`rm --keep-config`):
+
+1. Plugin files are deleted
+2. Your config files are preserved in the plugin directory
+3. You can safely reinstall later without losing your settings
+
+**Example:**
+
 ```bash
-# Update plugin but keep user's config.json and CSV files
+# Normal workflow - your config is preserved automatically
 python plugins.py sync
 
-# Remove plugin but preserve all user-modified files
+# Remove plugin but keep your settings for later
 python plugins.py rm holiday_countdown_board --keep-config
 
-# Force fresh install (no preservation)
-# First remove without preserving, then re-add
-python plugins.py rm holiday_countdown_board
-python plugins.py add holiday_countdown_board https://github.com/kas21/nls-plugin-holiday-countdown.git
+# Reinstall later - your old config.json will still be there!
+python plugins.py add https://github.com/kas21/nls-plugin-holiday-countdown.git
 ```
 
-## How It Works
+## Using Plugins
 
-### Plugin Naming (Important!)
-- Each plugin **must** define `__plugin_id__` in its `__init__.py`
-- This ensures consistent folder names across all installations
-- Example: `__plugin_id__ = "nfl_board"`
-- The plugin manager auto-detects this ID when you run `add`
-- Users cannot accidentally misconfigure plugin names
+After installing plugins with the plugin manager, you need to configure them in your main scoreboard configuration.
 
-### First Time Setup
-1. Clone the repo - it includes `plugins.json.example` with recommended plugins
-2. Copy `plugins.json.example` to `plugins.json` (or let `add` create it)
-3. Run `python plugins.py sync` to install all plugins
+### 1. Copy Plugin Configuration
 
-## Creating a Plugin
+Each plugin has a `config.sample.json` file. Copy it to create your configuration:
 
-### Required Files
-Your plugin repo must contain:
-- `__init__.py` - Plugin metadata (including **`__plugin_id__`**)
-- `board.py` - Board class inheriting from `BoardBase`
-- `config.sample.json` - Sample configuration
-
-### Minimal __init__.py Example
-```python
-"""
-My Custom Board Plugin
-"""
-
-# REQUIRED: Canonical folder name for installation
-__plugin_id__ = "my_custom_board"
-
-# Optional metadata
-__version__ = "1.0.0"
-__description__ = "My custom board for displaying data"
-__board_name__ = "My Custom Board"
-__author__ = "Your Name"
-
-# Optional: Additional dependencies
-__requirements__ = []
-
-# Optional: Files to preserve during updates
-__preserve_files__ = [
-    "config.json",
-    "custom_data.csv"
-]
+```bash
+cd src/boards/plugins/your_plugin
+cp config.sample.json config.json
+nano config.json
 ```
 
-### Plugin ID Rules
-- Must be a valid Python module name (lowercase, underscores only)
-- Should match your local folder structure expectations
-- Examples: `nfl_board`, `holiday_countdown_board`, `other_board`
-- **NOT**: `NFL-Board`, `holiday countdown`, `other.board`
+### 2. Add to Main Configuration
+
+Edit `config/config.json` to add the plugin to your board rotation:
+
+```json
+"states": {
+    "off_day": [
+        "your_plugin",
+        "clock",
+        "scoreticker"
+    ]
+}
+```
+
+### 3. Restart Scoreboard
+
+Restart the scoreboard for changes to take effect:
+
+```bash
+sudo systemctl restart nhl-scoreboard
+```
+
+## First Time Setup
+
+**Step-by-step guide to get plugins working:**
+
+1. **Clone the nhl-led-scoreboard repo** - It includes `plugins.json.example` with recommended plugins
+
+2. **Copy the example configuration:**
+
+   ```bash
+   cp plugins.json.example plugins.json
+   ```
+
+3. **Edit `plugins.json`** to customize which plugins you want:
+
+   ```bash
+   nano plugins.json
+   ```
+
+4. **Install all plugins:**
+
+   ```bash
+   python plugins.py sync
+   ```
+
+5. **Configure each plugin** (see "Using Plugins" above)
+
+6. **Add plugins to your board rotation** in `config/config.json`
+
+7. **Restart the scoreboard:**
+
+   ```bash
+   sudo systemctl restart nhl-scoreboard
+   ```
+
+## Troubleshooting
+
+### Plugin Not Loading
+
+**Check these in order:**
+
+1. **Verify plugin is installed:**
+
+   ```bash
+   python plugins.py list
+   ```
+
+   Look for your plugin - STATUS should be "present"
+
+2. **Check plugin is in your board rotation:**
+
+   Open `config/config.json` and verify the plugin ID is listed in one of the states (e.g., `off_day`, `intermission`)
+
+3. **Check scoreboard logs for errors:**
+
+   ```bash
+   sudo tail -50 /var/log/supervisor/nhl-scoreboard-error.log
+   sudo tail -50 /var/log/supervisor/nhl-scoreboard.log 
+   ```
+
+   Look for error messages mentioning your plugin name
+
+4. **Verify plugin configuration exists:**
+
+   ```bash
+   ls src/boards/plugins/your_plugin/config.json
+   ```
+
+   If missing, copy from `config.sample.json`
+
+### Update Failed
+
+If `python plugins.py sync` fails to update a plugin:
+
+1. **Check your internet connection**
+2. **Try with verbose logging to see detailed errors:**
+
+   ```bash
+   python plugins.py --verbose sync
+   ```
+
+3. **Verify the git repository URL is correct** in `plugins.json`
+4. **Check if the repository is accessible** (try opening the GitHub URL in a browser)
+
+The plugin manager automatically restores the previous version if an update fails, so your installation is safe.
+
+### Configuration Missing After Update
+
+Your configuration should be preserved automatically! If it's missing:
+
+1. **Check if config.json exists:**
+
+   ```bash
+   ls src/boards/plugins/your_plugin/config.json
+   ```
+
+2. **Look for backup files** in the plugin directory
+
+3. **Copy from the sample:**
+
+   ```bash
+   cd src/boards/plugins/your_plugin
+   cp config.sample.json config.json
+   ```
+
+4. **Report the issue** if this keeps happening - it may be a bug
+
+### Verbose Logging
+
+Enable verbose logging to see detailed information about what the plugin manager is doing:
+
+```bash
+python plugins.py --verbose sync
+python plugins.py --verbose add https://github.com/user/plugin.git
+```
+
+This shows:
+
+- Git commands being executed
+- Files being preserved/restored
+- Detailed error messages
+- Plugin detection process
+
+## Creating Plugins
+
+For detailed information about developing your own plugins, see the [Example Board Plugin README](src/boards/plugins/example_board/README.md), which provides:
+
+- Complete plugin structure documentation
+- Code examples and patterns
+- Step-by-step development guide
+- Best practices and conventions

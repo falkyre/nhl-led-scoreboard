@@ -1,0 +1,7 @@
+{
+    "message": "Plugin System Works!",
+    "text_color": "cyan",
+    "display_seconds": 5,
+    "enabled": true,
+    "description": "Configuration for the example plugin"
+}

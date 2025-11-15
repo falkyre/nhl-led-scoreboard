@@ -70,6 +70,34 @@
       "position": ["50%", 6],
       "align": "center-top"
     },
+    "pp_badge_home_time": {
+      "position": ["100%", "100%"],
+      "align": "right-bottom",
+      "font": "small"
+    },
+    "pp_badge_home": {
+      "position": [-2, 0],
+      "relative": {
+        "to": "pp_badge_home_time",
+        "align": "left"
+      },
+      "font": "small",
+      "align": "right"
+    },
+    "pp_badge_away_time": {
+      "position": ["0%", "100%"],
+      "align": "left-bottom",
+      "font": "small"
+    },
+    "pp_badge_away": {
+      "position":[2, 0],
+      "relative": {
+        "to": "pp_badge_away_time",
+        "align": "right"
+      },
+      "font": "small",
+      "align": "left"
+    },
     "irregular_status": {
       "position": ["50%", 6],
       "align": "center-top"

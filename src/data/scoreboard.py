@@ -10,7 +10,7 @@ debug = logging.getLogger("scoreboard")
 
 def filter_plays(plays, away_id, home_id):
     """
-        Take a list of scoring plays and split them into their cooresponding team.
+        Take a list of scoring plays and split them into their corresponding team.
         return two list, one for each team.
     """
     scoring_plays = []
@@ -99,7 +99,10 @@ class GameSummaryBoard:
 
 
         self.date = datetime.strptime(game_details["gameDate"], '%Y-%m-%d').strftime("%b %d")
-        self.start_time = convert_time(datetime.strptime(game_details["startTimeUTC"],'%Y-%m-%dT%H:%M:%SZ')).strftime(time_format)
+        start_dt = datetime.strptime(
+            game_details["startTimeUTC"], '%Y-%m-%dT%H:%M:%SZ'
+        )
+        self.start_time = convert_time(start_dt).strftime(time_format)
         self.status = game_details["gameState"]
         self.periods = Periods(game_details)
         try:
@@ -107,7 +110,7 @@ class GameSummaryBoard:
         except KeyError:
             self.intermission = False
 
-        if game_details["gameState"] == "OFF" or game_details["gameState"] == "FINAL" or game_details["gameState"] == "OVER":
+        if game_details.get("gameState") in ("OFF", "FINAL", "OVER"):
             if game_details["awayTeam"]["score"] > game_details["homeTeam"]["score"]:
                 self.winning_team_id = game_details["awayTeam"]["id"]
                 self.winning_score = game_details["awayTeam"]["score"]
@@ -190,7 +193,11 @@ class Scoreboard(GameSummaryBoard):
         away_skaters = 5
         if len(overview["plays"]) > 0:
             plays = overview["plays"]
-            away_scoring_plays, away_penalty_plays, home_scoring_plays, home_penalty_plays = filter_plays(plays, away_team_id, home_team_id)
+            away_scoring_plays, away_penalty_plays, home_scoring_plays, home_penalty_plays = filter_plays(
+                plays,
+                away_team_id,
+                home_team_id,
+            )
 
             # Get the Away Goal details
             for play in away_scoring_plays:
@@ -234,6 +241,10 @@ class Scoreboard(GameSummaryBoard):
         # Parse game situation (power plays, goalie pulled, etc.)
         home_pp = False
         away_pp = False
+        # this really should be stored at the situation level, but because of how we are currently handling penalties,
+        # we are going to store it with the teams data.
+        home_pp_time_remaining = None
+        away_pp_time_remaining = None
         home_goalie_pulled = False
         away_goalie_pulled = False
 
@@ -244,11 +255,13 @@ class Scoreboard(GameSummaryBoard):
                 if overview["situation"]["homeTeam"].get("situationDescriptions"):
                     if "PP" in overview["situation"]["homeTeam"]["situationDescriptions"]:
                         home_pp = True
+                        home_pp_time_remaining = overview["situation"].get("timeRemaining")
                     if "EN" in overview["situation"]["homeTeam"]["situationDescriptions"]:
                         home_goalie_pulled = True
                 if overview["situation"]["awayTeam"].get("situationDescriptions"):
                     if "PP" in overview["situation"]["awayTeam"]["situationDescriptions"]:
                         away_pp = True
+                        away_pp_time_remaining = overview["situation"].get("timeRemaining")
                     if "EN" in overview["situation"]["awayTeam"]["situationDescriptions"]:
                         away_goalie_pulled = True
         except Exception:
@@ -266,6 +279,7 @@ class Scoreboard(GameSummaryBoard):
             away_team_sog,
             away_penalties,
             away_pp,
+            away_pp_time_remaining,
             away_skaters,
             away_goalie_pulled,
             away_goal_plays
@@ -278,6 +292,7 @@ class Scoreboard(GameSummaryBoard):
             home_team_sog,
             home_penalties,
             home_pp,
+            home_pp_time_remaining,
             home_skaters,
             home_goalie_pulled,
             home_goal_plays
