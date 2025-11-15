@@ -25,7 +25,6 @@ from boards.scoreticker import Scoreticker
 from boards.screensaver import screenSaver
 from boards.seriesticker import Seriesticker
 from boards.standings import Standings
-from boards.stats_leaders import StatsLeaders
 from boards.team_summary import TeamSummary
 from boards.wxAlert import wxAlert
 from boards.wxForecast import wxForecast
@@ -84,7 +83,6 @@ class Boards:
             "christmas": Christmas,
             "player_stats": PlayerStatsRenderer,
             "ovi_tracker": OviTrackerRenderer,
-            "stats_leaders": StatsLeaders,
         }
 
         for board_id, board_class in legacy_boards.items():
@@ -773,15 +771,10 @@ class Boards:
         board = self._get_cached_board_instance("ovi_tracker", OviTrackerRenderer, data, matrix, sleepEvent)
         board.render()
 
-    def stats_leaders(self, data, matrix, sleepEvent):
-        board = self._get_cached_board_instance("stats_leaders", StatsLeaders, data, matrix, sleepEvent)
-        board.render()
-
     def _get_board_list(self):
         boards = []
 
-        # Add stats leaders board check
-        if self.data.config.boards_enabled["stats_leaders"]:
-            boards.append(self.stats_leaders)
+        # Legacy board list is now empty - all boards managed through BoardManager
+        # This method kept for backward compatibility
 
         return boards
