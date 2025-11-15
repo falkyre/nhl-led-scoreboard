@@ -30,6 +30,7 @@ class StatsLeadersBoard(BoardBase):
         self.rotation_rate = self.get_config_value('rotation_rate', 5)
         self.use_large_font = self.get_config_value('use_large_font', False)
         self.scroll_speed = self.get_config_value('scroll_speed', 0.2)
+        self.limit = self.get_config_value('limit', 10)
 
         # Set font and sizing based on use_large_font config
         if self.use_large_font and self.matrix.width >= 128:
@@ -65,14 +66,14 @@ class StatsLeadersBoard(BoardBase):
                     return
 
                 # Use the imported function directly
-                leaders_data = get_skater_stats_leaders(category=category, limit=10)
+                leaders_data = get_skater_stats_leaders(category=category, limit=self.limit)
 
                 if not leaders_data or category not in leaders_data:
                     debug.error(f"Stats leaders board unavailable due to missing information from the API for category: {category}")
                     return
 
-                # Calculate image height (header + 10 players, using dynamic font_height)
-                im_height = (11 * self.font_height)  # 11 rows total (1 header + 10 players)
+                # Calculate image height (header + players, using dynamic font_height)
+                im_height = ((self.limit + 1) * self.font_height)  # header + configured number of players
 
                 # Create and draw the image
                 image = self.draw_leaders(category, leaders_data[category], im_height, self.matrix.width)

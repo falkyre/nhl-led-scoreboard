@@ -7,5 +7,6 @@
   ],
   "use_large_font": true,
   "scroll_speed": 0.07,
+  "limit": 10,
   "enabled": true
 }
