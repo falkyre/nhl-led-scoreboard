@@ -1,0 +1,9 @@
+{
+  "rotation_rate": 7,
+  "categories": [
+    "goals",
+    "assists",
+    "points"
+  ],
+  "enabled": true
+}

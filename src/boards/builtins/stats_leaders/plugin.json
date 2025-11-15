@@ -1,0 +1,12 @@
+{
+  "name": "stats_leaders",
+  "description": "NHL Statistics Leaders Board",
+  "version": "1.0.0",
+  "boards": [
+    {
+      "id": "stats_leaders",
+      "class_name": "StatsLeadersBoard",
+      "module": "board"
+    }
+  ]
+}
