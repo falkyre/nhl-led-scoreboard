@@ -41,7 +41,7 @@ class ecWxWorker(object):
 
 
             if len(curr_cond) == 0:
-                debug.error("Unable to get EC current observations. Check https://dd.weather.gc.ca/citypage_weather/xml/ to see if current conditions are populated.")  # noqa: E501
+                debug.error("Unable to get EC current observations. Check https://dd.weather.gc.ca/citypage_weather/xml/ to see if current conditions are populated.")
                 self.data.wx_updated = False
             else:
                 self.data.wx_updated = True

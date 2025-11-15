@@ -13,7 +13,7 @@ APScheduler
 lastversion>=1.1.6
 nameparser>=1.0.6
 iso6709
-paho-mqtt>=2.1.0
+paho-mqtt
 rich
 richcolorlog==1.44.12
 RGBMatrixEmulator
@@ -22,4 +22,3 @@ diskcache
 backoff
 env-canada>=0.12.1
 httpx==0.28.1
-watchdog

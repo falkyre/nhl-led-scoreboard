@@ -14,7 +14,7 @@ nameparser>=1.0.6
 pillow==11.1.0
 dbus-python
 iso6709
-paho-mqtt>=2.1.0
+paho-mqtt
 rich
 richcolorlog==1.44.12
 RGBMatrixEmulator
@@ -25,4 +25,3 @@ bottleneck==1.4.2
 pandas==2.2.3
 env-canada>=0.12.1
 httpx==0.28.1
-watchdog

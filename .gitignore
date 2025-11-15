@@ -186,4 +186,3 @@ plugins.lock.json
 .devcontainer.json
 nhl_setup
 RELEASE_NOTE.md
-config.html

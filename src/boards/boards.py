@@ -32,7 +32,6 @@ from boards.wxForecast import wxForecast
 from boards.wxWeather import wxWeather
 
 from .base_board import BoardBase
-from .board_manager import BoardManager
 
 debug = logging.getLogger("scoreboard")
 
@@ -40,12 +39,10 @@ debug = logging.getLogger("scoreboard")
 class Boards:
     def __init__(self):
         self._boards = {}
-        self._board_instances = {}  # Deprecated: kept for backward compatibility
+        self._board_instances = {}  # Cache for board instances
         self._app_version = self._get_app_version()
         self._register_legacy_boards()
         self._load_boards()
-        # Initialize the BoardManager after boards are discovered/registered
-        self.board_manager = BoardManager(self)
 
     def _get_app_version(self) -> str:
         """
@@ -317,10 +314,10 @@ class Boards:
 
     def render_board(self, board_id: str, data, matrix, sleepEvent):
         """
-        Render any board by ID with automatic lazy initialization.
+        Render any board by ID with automatic instance caching.
 
         This is the preferred way to render boards loaded from plugins/builtins
-        and legacy boards. Delegates to BoardManager for lifecycle management.
+        and legacy boards. Automatically detects whether to call render() or draw().
 
         Args:
             board_id: The board identifier (from plugin.json or legacy board name)
@@ -334,8 +331,28 @@ class Boards:
         Raises:
             ValueError: If board_id is not found in registry
         """
-        # Delegate to BoardManager
-        return self.board_manager.render_board(board_id, data, matrix, sleepEvent)
+        if board_id not in self._boards:
+            raise ValueError(
+                f"Board '{board_id}' not found. Available boards: {', '.join(self._boards.keys())}"
+            )
+
+        # Get or create cached instance
+        if board_id not in self._board_instances:
+            board_class = self._boards[board_id]
+            self._board_instances[board_id] = board_class(data, matrix, sleepEvent)
+            debug.info(f"Created new instance for board: {board_id}")
+        else:
+            debug.debug(f"Using cached instance for board: {board_id}")
+
+        # Call the appropriate method (render() or draw())
+        board_instance = self._board_instances[board_id]
+        if hasattr(board_instance, 'render'):
+            return board_instance.render()
+        elif hasattr(board_instance, 'draw'):
+            return board_instance.draw()
+        else:
+            debug.error(f"Board '{board_id}' has neither render() nor draw() method")
+            return None
 
 
     def get_available_boards(self) -> dict:
@@ -386,26 +403,63 @@ class Boards:
         """
         Clear cached board instances and call cleanup.
 
-        Delegates to BoardManager for lifecycle management.
-
         Args:
             board_name: Specific board to clear, or None to clear all
         """
         if board_name:
-            self.board_manager.cleanup_board(board_name)
+            if board_name in self._board_instances:
+                board = self._board_instances[board_name]
+                if hasattr(board, "cleanup"):
+                    board.cleanup()
+                del self._board_instances[board_name]
+                debug.info(f"Cleared cached instance for board: {board_name}")
         else:
-            self.board_manager.clear_all_boards()
+            # Clear all cached instances
+            for name, board in self._board_instances.items():
+                if hasattr(board, "cleanup"):
+                    board.cleanup()
+            self._board_instances.clear()
+            debug.info("Cleared all cached board instances")
 
     def get_cached_boards(self) -> list:
         """
-        Get list of currently initialized board names.
-
-        Delegates to BoardManager.
+        Get list of currently cached board names.
 
         Returns:
-            List of board names that have initialized instances
+            List of board names that have cached instances
         """
-        return self.board_manager.get_initialized_boards()
+        return list(self._board_instances.keys())
+
+    def initialize_boards_with_data_requirements(self, data, matrix, sleepEvent):
+        """
+        Pre-initialize boards that require early data fetching.
+
+        This method checks board classes for requires_early_initialization = True and
+        only instantiates those boards, allowing them to start background data fetching
+        before the render loop begins.
+
+        Args:
+            data: Application data object
+            matrix: Display matrix object
+            sleepEvent: Threading event for sleep/wake control
+        """
+        debug.info("Boards: Pre-initializing boards with data requirements")
+        initialized_count = 0
+
+        for board_name, board_class in self._boards.items():
+            try:
+                # Check class attribute directly - no need to instantiate to check
+                if getattr(board_class, "requires_early_initialization", False):
+                    # Only instantiate boards that actually need early initialization
+                    board_instance = board_class(data, matrix, sleepEvent)
+                    self._board_instances[board_name] = board_instance
+                    debug.info(f"Boards: Pre-initialized board '{board_name}' for early data fetching")
+                    initialized_count += 1
+
+            except Exception as exc:
+                debug.error(f"Boards: Failed to pre-initialize board '{board_name}': {exc}")
+
+        debug.info(f"Boards: Pre-initialized {initialized_count} boards with data requirements")
 
     # Board handler for PushButton
     def _pb_board(self, data, matrix, sleepEvent):
@@ -421,11 +475,9 @@ class Boards:
 
     # Board handler for Off day state
     def _off_day(self, data, matrix, sleepEvent):
-        # Snapshot the board list to avoid issues if config changes mid-loop
-        boards_list = list(data.config.boards_off_day)
         bord_index = 0
         while True:
-            board_id = boards_list[bord_index]
+            board_id = data.config.boards_off_day[bord_index]
             data.curr_board = board_id
             debug.debug(f"Off Day Board Index: {bord_index} Board: {board_id}")
 
@@ -449,7 +501,7 @@ class Boards:
                     + data.mqtt_showboard
                     + " board "
                     + "Overriding off_day -> "
-                    + boards_list[bord_index]
+                    + data.config.boards_off_day[bord_index]
                 )
                 if not data.screensaver:
                     data.mqtt_trigger = False
@@ -473,7 +525,7 @@ class Boards:
                     # Display the board from the config
                     board_id = "screensaver"
                     data.curr_board = "screensaver"
-                    data.prev_board = boards_list[bord_index]
+                    data.prev_board = data.config.boards_off_day[bord_index]
                     bord_index -= 1
                 else:
                     data.pb_trigger = False
@@ -488,18 +540,16 @@ class Boards:
                     "Check board exists and config.json is correct"
                 )
 
-            if bord_index >= (len(boards_list) - 1):
+            if bord_index >= (len(data.config.boards_off_day) - 1):
                 return
             else:
                 if not data.pb_trigger or not data.wx_alert_interrupt or not data.screensaver or not data.mqtt_trigger:
                     bord_index += 1
 
     def _scheduled(self, data, matrix, sleepEvent):
-        # Snapshot the board list to avoid issues if config changes mid-loop
-        boards_list = list(data.config.boards_scheduled)
         bord_index = 0
         while True:
-            board_id = boards_list[bord_index]
+            board_id = data.config.boards_scheduled[bord_index]
             data.curr_board = board_id
 
             if data.pb_trigger:
@@ -522,7 +572,7 @@ class Boards:
                     + data.mqtt_showboard
                     + " board "
                     + "Overriding scheduled -> "
-                    + boards_list[bord_index]
+                    + data.config.boards_scheduled[bord_index]
                 )
                 if not data.screensaver:
                     data.mqtt_trigger = False
@@ -546,7 +596,7 @@ class Boards:
                     # Display the board from the config
                     board_id = "screensaver"
                     data.curr_board = "screensaver"
-                    data.prev_board = boards_list[bord_index]
+                    data.prev_board = data.config.boards_off_day[bord_index]
                     bord_index -= 1
                 else:
                     data.pb_trigger = False
@@ -560,18 +610,16 @@ class Boards:
                     "Check board exists and config.json is correct"
                 )
 
-            if bord_index >= (len(boards_list) - 1):
+            if bord_index >= (len(data.config.boards_scheduled) - 1):
                 return
             else:
                 if not data.pb_trigger or not data.wx_alert_interrupt or not data.screensaver or not data.mqtt_trigger:
                     bord_index += 1
 
     def _intermission(self, data, matrix, sleepEvent):
-        # Snapshot the board list to avoid issues if config changes mid-loop
-        boards_list = list(data.config.boards_intermission)
         bord_index = 0
         while True:
-            board_id = boards_list[bord_index]
+            board_id = data.config.boards_intermission[bord_index]
             data.curr_board = board_id
 
             if data.pb_trigger:
@@ -594,7 +642,7 @@ class Boards:
                     + data.mqtt_showboard
                     + " board "
                     + "Overriding intermission -> "
-                    + boards_list[bord_index]
+                    + data.config.boards_intermission[bord_index]
                 )
                 if not data.screensaver:
                     data.mqtt_trigger = False
@@ -618,7 +666,7 @@ class Boards:
             #         #Display the board from the config
             #         board_id = "screensaver"
             #         data.curr_board = "screensaver"
-            #         data.prev_board = boards_list[bord_index]
+            #         data.prev_board = data.config.boards_off_day[bord_index]
             #         bord_index -= 1
             #     else:
             #         data.pb_trigger = False
@@ -632,18 +680,16 @@ class Boards:
                     "Check board exists and config.json is correct"
                 )
 
-            if bord_index >= (len(boards_list) - 1):
+            if bord_index >= (len(data.config.boards_intermission) - 1):
                 return
             else:
                 if not data.pb_trigger or not data.wx_alert_interrupt or not data.screensaver or not data.mqtt_trigger:
                     bord_index += 1
 
     def _post_game(self, data, matrix, sleepEvent):
-        # Snapshot the board list to avoid issues if config changes mid-loop
-        boards_list = list(data.config.boards_post_game)
         bord_index = 0
         while True:
-            board_id = boards_list[bord_index]
+            board_id = data.config.boards_post_game[bord_index]
             data.curr_board = board_id
 
             if data.pb_trigger:
@@ -666,7 +712,7 @@ class Boards:
                     + data.mqtt_showboard
                     + " board "
                     + "Overriding post_game -> "
-                    + boards_list[bord_index]
+                    + data.config.boards_post_game[bord_index]
                 )
                 if not data.screensaver:
                     data.mqtt_trigger = False
@@ -690,7 +736,7 @@ class Boards:
                     # Display the board from the config
                     board_id = "screensaver"
                     data.curr_board = "screensaver"
-                    data.prev_board = boards_list[bord_index]
+                    data.prev_board = data.config.boards_off_day[bord_index]
                     bord_index -= 1
                 else:
                     data.pb_trigger = False
@@ -704,7 +750,7 @@ class Boards:
                     "Check board exists and config.json is correct"
                 )
 
-            if bord_index >= (len(boards_list) - 1):
+            if bord_index >= (len(data.config.boards_post_game) - 1):
                 return
             else:
                 if not data.pb_trigger or not data.wx_alert_interrupt or not data.screensaver or not data.mqtt_trigger:

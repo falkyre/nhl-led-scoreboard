@@ -13,19 +13,8 @@ debug = logging.getLogger("scoreboard")
 
 class ScoreboardConfig:
     def __init__(self, filename_base, args, size):
-        self.filename_base = filename_base
-        self.args = args
-        self.size = size
+        json = self.__get_config(filename_base)
 
-        # Store config file path for watcher
-        self.config_file_path = get_file("config/config.json")
-        self.config_schema_path = get_file("config/config.schema.json")
-
-        json_data = self.__get_config(filename_base)
-
-        self._load_attributes(json_data)
-
-    def _load_attributes(self, json):
         self.testing_mode = False
         self.test_goal_animation = False
         self.testScChampions = False
@@ -44,17 +33,23 @@ class ScoreboardConfig:
         self.preferred_teams = json["preferences"]["teams"]
         self.sog_display_frequency = json["preferences"]["sog_display_frequency"]
 
+
         # Goal animation
         self.goal_anim_pref_team_only = json["preferences"]["goal_animations"]["pref_team_only"]
 
         # Penalty animation
         self.disable_penalty_animation = json["preferences"].get("disable_penalty_animation", False)
 
-        # MQTT settings
+        # Show power play details on live game scoreboard
+        self.show_power_play_details = json["preferences"].get("show_power_play_details", False)
+
+        #MQTT settings
+        #Add in the try/except as this is not a required section in the config
         try:
             self.mqtt_enabled = json["sbio"]["mqtt"]["enabled"]
         except KeyError:
             self.mqtt_enabled = False
+
 
         self.mqtt_main_topic = ""
         self.mqtt_username = ""
@@ -63,6 +58,7 @@ class ScoreboardConfig:
         if self.mqtt_enabled:
             self.mqtt_broker = json["sbio"]["mqtt"]["broker"]
             self.mqtt_port = json["sbio"]["mqtt"]["port"]
+            # Check and see if there is a main_topic in the config.json
             try:
                 self.mqtt_main_topic =  json["sbio"]["mqtt"]["main_topic"]
             except KeyError:
@@ -74,7 +70,7 @@ class ScoreboardConfig:
             except KeyError:
                 pass
 
-        # Screen Saver entries
+        #Screen Saver entries
         self.screensaver_enabled = json["sbio"]["screensaver"]["enabled"]
         self.screensaver_animations = json["sbio"]["screensaver"]["animations"]
         self.screensaver_start = json["sbio"]["screensaver"]["start"]
@@ -100,9 +96,12 @@ class ScoreboardConfig:
         self.pushbutton_enabled = json["sbio"]["pushbutton"]["enabled"]
         self.pushbutton_bonnet = json["sbio"]["pushbutton"]["bonnet"]
         self.pushbutton_pin = json["sbio"]["pushbutton"]["pin"]
+        # Reboot duration should be a medium time press (ie greater than 2 seconds)
         self.pushbutton_reboot_duration = json["sbio"]["pushbutton"]["reboot_duration"]
+        # Override process is used to trigger a different process other than the default.  reboot uses /sbin/reboot poweroff uses /sbin/poweroff
         self.pushbutton_reboot_override_process = json["sbio"]["pushbutton"]["reboot_override_process"]
         self.pushbutton_display_reboot = json["sbio"]["pushbutton"]["display_reboot"]
+        # Poweroff duration should be a long press (greater than 5 or 6 seconds).  This is ties to the hold_time property of a button
         self.pushbutton_poweroff_duration = json["sbio"]["pushbutton"]["poweroff_duration"]
         self.pushbutton_poweroff_override_process = json["sbio"]["pushbutton"]["poweroff_override_process"]
         self.pushbutton_display_halt = json["sbio"]["pushbutton"]["display_halt"]
@@ -117,31 +116,46 @@ class ScoreboardConfig:
         self.weather_data_feed = json["boards"]["weather"]["data_feed"]
         self.weather_owm_apikey = json["boards"]["weather"]["owm_apikey"]
         self.weather_update_freq = json["boards"]["weather"]["update_freq"]
+        # Show curr temp, humidity on clock
         self.weather_show_on_clock = json["boards"]["weather"]["show_on_clock"]
+        # Forecast settings
         self.weather_forecast_enabled = json["boards"]["weather"]["forecast_enabled"]
         self.weather_forecast_show_today = json["boards"]["weather"]["forecast_show_today"]
+        #Number of days up to 3 for forecast
         self.weather_forecast_days = json["boards"]["weather"]["forecast_days"]
         if self.weather_forecast_show_today:
             self.weather_forecast_days += 1
+        #How frequent, in hours, to update the forecast
         self.weather_forecast_update = json["boards"]["weather"]["forecast_update"]
 
-        # Weather Alerts Preferences
+        #Weather Alerts Preferences
         self.wxalert_alert_feed = json["boards"]["wxalert"]["alert_feed"]
+        #Allow the weather thread to interrupt the current flow of the display loop and show an alert if it shows up
+        #Similar to how a pushbutton interrupts the flow
         self.wxalert_show_alerts = json["boards"]["wxalert"]["show_alerts"]
+        #Show expire time instead of effective time of NWS alerts
         self.wxalert_nws_show_expire = json["boards"]["wxalert"]["nws_show_expire"]
+        # Display on top and bottom bar the severity (for US) and type
         self.wxalert_alert_title = json["boards"]["wxalert"]["alert_title"]
+        # Display static alert or scrolling
         self.wxalert_scroll_alert = json["boards"]["wxalert"]["scroll_alert"]
+        # How long to display static alert in seconds
         self.wxalert_alert_duration = json["boards"]["wxalert"]["alert_duration"]
+        # Show any alerts on clock
         self.wxalert_show_on_clock = json["boards"]["wxalert"]["show_on_clock"]
         self.wxalert_update_freq = json["boards"]["wxalert"]["update_freq"]
 
+
+
         # States
+        '''TODO: Put condition so that the user dont leave any board list empty'''
         self.boards_off_day = json["states"]["off_day"]
         self.boards_scheduled = json["states"]["scheduled"]
         self.boards_intermission = json["states"]["intermission"]
         self.boards_post_game = json["states"]["post_game"]
 
         # Boards configuration
+        # Boards
         # Scoreticker
         self.preferred_teams_only = json["boards"]["scoreticker"]["preferred_teams_only"]
         self.scoreticker_rotation_rate = json["boards"]["scoreticker"]["rotation_rate"]
@@ -159,6 +173,7 @@ class ScoreboardConfig:
         self.standing_type = json["boards"]["standings"]["standing_type"]
         self.preferred_divisions = json["boards"]["standings"]["divisions"]
         self.preferred_conference = json["boards"]["standings"]["conference"]
+
         try:
             self.wildcard_limit = json["boards"]["standings"]["wildcard_limit"]
         except KeyError:
@@ -194,44 +209,60 @@ class ScoreboardConfig:
         # Fonts
         self.layout = Layout()
 
-        self.team_colors = Color(self.__get_config("colors/teams"))
-        self.config = Config(self.size)
+        # load colors
+        self.team_colors = Color(self.__get_config(
+            "colors/teams"
+        ))
 
-        if self.args.testScChampions is not None:
-            self.testScChampions = self.args.testScChampions
-        if self.args.testing_mode:
+        self.config = Config(size)
+
+        if args.testScChampions is not None:
+            self.testScChampions = args.testScChampions
+
+        if args.testing_mode :
             self.testing_mode = True
-        if self.args.test_goal_animation:
+
+        if args.test_goal_animation :
             self.test_goal_animation = True
 
+
     def read_json(self, filename):
+        # Find and return a json file
+
         j = {}
         path = get_file("config/{}".format(filename))
         try:
             j = json.load(open(path))
             msg = "json loaded OK"
-        except (json.decoder.JSONDecodeError, FileNotFoundError) as e:
+        except (json.decoder.JSONDecodeError, FileNotFoundError)  as e:
             msg = "Unable to load json: {0}".format(e)
             j = {}
+
         return j, msg
 
     def __get_config(self, base_filename, error=None):
+        # Look and return config.json file
+
         filename = "{}.json".format(base_filename)
+
         (reference_config, error) = self.read_json(filename)
         if not reference_config:
             if (error):
                 debug.error(error)
             else:
-                debug.error("Invalid {} config file. Make sure {} exists in config/".format(base_filename, base_filename))  # noqa: E501
+                debug.error("Invalid {} config file. Make sure {} exists in config/".format(base_filename, base_filename))
             sys.exit(1)
 
+
         if base_filename == "config":
+            # Validate against the config.json
             debug.info("Validating config.json.....")
             conffile = "config/config.json"
             schemafile = "config/config.schema.json"
+
             confpath = get_file(conffile)
             schemapath = get_file(schemafile)
-            (valid, msg) = validateConf(confpath, schemapath)
+            (valid,msg) = validateConf(confpath,schemapath)
             if valid:
                 debug.info("config.json passes validation")
             else:
@@ -242,25 +273,12 @@ class ScoreboardConfig:
         return reference_config
 
     def __get_time_format(self, config):
+        # Set the time format to 12h.
         time_format = "%I:%M"
+
+        # Check if the time format is different in the config. if so, change it.
         if config == "24h":
             time_format = "%H:%M"
+
         return time_format
 
-    def _reload_config(self):
-        """
-        Reloads the configuration from config/config.json and apply if valid.
-        Keeps previous config if validation fails.
-        """
-        debug.info("Attempting to reload config from config.json...")
-        (valid, msg) = validateConf(self.config_file_path, self.config_schema_path)
-        if valid:
-            debug.info("config.json passes validation. Reloading ScoreboardConfig parameters.")
-            new_config_dict, err = self.read_json("config.json")
-            if not new_config_dict:
-                debug.error(f"Failed to parse config.json during reload: {err}. Keeping the existing configuration.")
-                return
-            self._load_attributes(new_config_dict)
-            debug.info("Reloaded new config.json successfully.")
-        else:
-            debug.warning(f"Reloaded config.json is invalid: {msg}. Keeping the existing configuration.")
