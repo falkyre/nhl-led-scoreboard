@@ -29,6 +29,7 @@ class StatsLeadersBoard(BoardBase):
         self.enabled_categories = self.get_config_value('categories', ['goals', 'assists', 'points'])
         self.rotation_rate = self.get_config_value('rotation_rate', 5)
         self.use_large_font = self.get_config_value('use_large_font', False)
+        self.scroll_speed = self.get_config_value('scroll_speed', 0.2)
 
         # Set font and sizing based on use_large_font config
         if self.use_large_font and self.matrix.width >= 128:
@@ -87,7 +88,7 @@ class StatsLeadersBoard(BoardBase):
                     i -= 1
                     self.matrix.draw_image((0, i), image)
                     self.matrix.render()
-                    self.sleepEvent.wait(0.2)  # Scroll speed
+                    self.sleepEvent.wait(self.scroll_speed)
 
                 # Show bottom for rotation_rate seconds
                 self.sleepEvent.wait(self.rotation_rate)
