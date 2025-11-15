@@ -1,13 +1,13 @@
 """
 Stats Leaders board module implementation.
 """
-from PIL import Image, ImageDraw
-from utils import get_file
-from nhl_api.data import get_skater_stats_leaders
 import logging
 import traceback
 
+from PIL import Image, ImageDraw
+
 from boards.base_board import BoardBase
+from nhl_api.data import get_skater_stats_leaders
 
 debug = logging.getLogger("scoreboard")
 
@@ -61,15 +61,15 @@ class StatsLeadersBoard(BoardBase):
         try:
             for category in self.enabled_categories:
                 # Check if the category is valid
-                if not category in self.categories:
-                    debug.error(f"Stats leaders board unavailable due to missing information from the API for category: {category}")
+                if category not in self.categories:
+                    debug.error(f"Stats leaders board unavailable. Missing API information for category: {category}")
                     return
 
                 # Use the imported function directly
                 leaders_data = get_skater_stats_leaders(category=category, limit=self.limit)
 
                 if not leaders_data or category not in leaders_data:
-                    debug.error(f"Stats leaders board unavailable due to missing information from the API for category: {category}")
+                    debug.error(f"Stats leaders board unavailable. Missing API information for category: {category}")
                     return
 
                 # Calculate image height (header + players, using dynamic font_height)
