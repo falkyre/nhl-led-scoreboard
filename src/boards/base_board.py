@@ -220,6 +220,48 @@ class BoardBase(ABC):
         """
         return True
 
+    def get_config_value(self, key: str, default=None):
+        """
+        Get a configuration value with priority: central config -> board config -> default.
+
+        For builtin boards, this enables backward compatibility by checking the central
+        config.json first, then falling back to the board-specific config.json, and finally
+        to the provided default value.
+
+        Args:
+            key: The config key to look up (e.g., 'rotation_rate', 'categories')
+            default: Default value if key not found anywhere
+
+        Returns:
+            The config value from the highest priority source
+        """
+        # Extract board name from module path for central config lookup
+        board_module = self.__class__.__module__
+        board_name = None
+
+        if '.plugins.' in board_module or '.builtins.' in board_module:
+            module_parts = board_module.split('.')
+            if len(module_parts) >= 3:
+                board_name = module_parts[2]  # e.g., 'stats_leaders', 'season_countdown'
+
+        # Priority 1: Check central config (e.g., config.stats_leaders_rotation_rate)
+        if board_name and hasattr(self.data, 'config'):
+            central_key = f"{board_name}_{key}"
+            if hasattr(self.data.config, central_key):
+                value = getattr(self.data.config, central_key)
+                debug.debug(f"{board_name}: Using central config for '{key}': {value}")
+                return value
+
+        # Priority 2: Check board-specific config.json
+        if key in self.board_config:
+            value = self.board_config[key]
+            debug.debug(f"{board_name or self.board_name}: Using board config for '{key}': {value}")
+            return value
+
+        # Priority 3: Return default
+        debug.debug(f"{board_name or self.board_name}: Using default for '{key}': {default}")
+        return default
+
     def cleanup(self):
         """
         Cleanup resources when board is unloaded.
