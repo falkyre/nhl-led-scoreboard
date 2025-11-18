@@ -127,6 +127,7 @@ def run():
 
     # Any tasks that are scheduled go below this line
     scheduler_manager = SchedulerManager(data, matrix, sleepEvent)
+    data.scheduler_manager = scheduler_manager
     screensaver = scheduler_manager.schedule_jobs()
 
     # Create a queue for scoreboard events and info to be sent to an MQTT broker
