@@ -1094,12 +1094,11 @@ def cmd_sync(args):
     installed = []
 
     # Keep existing lock entries for plugins we're not updating
-    if not args.force and args.plugin is None:
-        lock_data = load_json(PLUGINS_LOCK)
-        existing_locked = lock_data.get("locked", [])
-        for locked in existing_locked:
-            if locked["name"] not in [p.get("name") for p in plugins_to_update]:
-                lock_entries.append(locked)
+    lock_data = load_json(PLUGINS_LOCK)
+    existing_locked = lock_data.get("locked", [])
+    for locked in existing_locked:
+        if locked["name"] not in [p.get("name") for p in plugins_to_update]:
+            lock_entries.append(locked)
 
     for plugin in plugins_to_update:
         url = plugin["url"]
