@@ -19,7 +19,6 @@ class wxAlert:
         self.data = data
         self.layout4 = self.data.config.config.layout.get_board_layout("wx_alert")
         self.matrix = matrix
-        self.pos = self.matrix.width
         self.banner_height = 8
         self.sleepEvent = sleepEvent
         self.scroll = self.data.config.wxalert_scroll_alert
@@ -44,6 +43,7 @@ class wxAlert:
             # Set the width, add 3 to allow for text to scroll completely off screen
             self.alert_width = alert_info["size"][0] + 3
             debug.debug("Alert width: {0}".format(self.alert_width))
+            self.pos = self.matrix.width
 
             if self.alert_width < self.pos:
                 self.alert_width = self.pos + 1
