@@ -33,17 +33,11 @@ atexit.register(force_cleanup)
 
 # --- Argument Parsing Helper ---
 def get_hardware_config():
-    # Defaults
     config = {
-        'cols': 64, 
-        'rows': 32, 
-        'mapping': 'regular', 
-        'sequence': 'RGB',
+        'cols': 64, 'rows': 32, 
+        'mapping': 'regular', 'sequence': 'RGB',
         'brightness': 100,
-        'gamma': 2.4,
-        'pwm_dither_bits': 0,
-        'row_addr_type': None,
-        'pwm_bits': 10 
+        'pwm_dither_bits': 0, 'row_addr_type': None, 'pwm_bits': 10 
     }
     
     parser = argparse.ArgumentParser(add_help=False)
@@ -71,20 +65,44 @@ def get_hardware_config():
 
 def get_pinout(mapping_name, is_bgr):
     name = mapping_name.replace('-', '_').lower()
-    
-    # If using BGR, we select the BGR variant. 
-    # For ANY other sequence (RBG, GRB, etc), we fallback to the Standard (RGB) pinout
-    # and handle the swapping in software.
     use_bgr_variant = is_bgr
-    
-    if name == 'regular':
-        return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
-    elif name == 'adafruit_hat':
-        return piomatter.Pinout.AdafruitMatrixHatBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixHat
-    elif name == 'adafruit_bonnet':
-        return piomatter.Pinout.AdafruitMatrixBonnetBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixBonnet
-    
+    if name == 'regular': return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
+    elif name == 'adafruit_hat': return piomatter.Pinout.AdafruitMatrixHatBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixHat
+    elif name == 'adafruit_bonnet': return piomatter.Pinout.AdafruitMatrixBonnetBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixBonnet
     return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
+
+
+# --- THE RESHADER CLASS ---
+class FrameReshader:
+    """
+    Adapts the palette reshading logic to work on full framebuffers.
+    Uses Linear scaling + a 'Floor Clamp' to prevent pixels from vanishing.
+    """
+    def __init__(self, brightness_percent):
+        # Store brightness as a float 0.0 - 1.0
+        self.brightness = max(0.01, brightness_percent / 100.0) 
+
+    def reshade(self, frame):
+        """
+        Takes a raw uint8 frame, scales it by brightness, 
+        and ensures no non-black pixel becomes black.
+        """
+        # 1. Linear Scaling (mimicking the reshader math)
+        # We use float32 for intermediate precision
+        shaded = frame.astype(np.float32) * self.brightness
+        
+        # 2. Convert back to integer (truncating)
+        output = shaded.astype(np.uint8)
+
+        # 3. The "Rescue" Mask (Crucial for Low Brightness)
+        # If the original frame had a pixel > 0, but the output is 0,
+        # we force it to 1. This prevents the "missing portions" issue.
+        if self.brightness < 0.1: # Only needed at very low brightness
+            mask = (frame > 0) & (output == 0)
+            output[mask] = 1
+            
+        return output
+
 
 # --- The Threaded Matrix Class ---
 class PiomatterMatrix(RGBMatrix):
@@ -95,51 +113,29 @@ class PiomatterMatrix(RGBMatrix):
         self.hw_width = hw_conf['cols']
         self.hw_height = hw_conf['rows']
         
-        # --- 1. Sequence Handling Logic ---
+        # --- Initialize Reshader ---
+        print(f"[Pi5 Bridge] Reshader Active | Brightness: {hw_conf['brightness']}%")
+        self.reshader = FrameReshader(hw_conf['brightness'])
+
+        # --- Sequence Handling ---
         seq = hw_conf['sequence'].upper()
-        
-        # Check if we can use Native Hardware Support
         is_native_bgr = (seq == "BGR")
         is_native_rgb = (seq == "RGB")
-        
         self.reorder_indices = None
-
-        if is_native_rgb:
-            print("[Pi5 Bridge] Color Sequence: RGB (Native)")
-        elif is_native_bgr:
-            print("[Pi5 Bridge] Color Sequence: BGR (Native Hardware Support)")
-        else:
-            # For weird sequences (RBG, GRB, etc), we calculate software reordering
-            # map 'R'->0, 'G'->1, 'B'->2 based on input string
+        if not (is_native_rgb or is_native_bgr):
             try:
                 channel_map = {'R': 0, 'G': 1, 'B': 2}
                 self.reorder_indices = [channel_map[char] for char in seq]
-                print(f"[Pi5 Bridge] Color Sequence: {seq} (Software Reordering: {self.reorder_indices})")
             except KeyError:
-                print(f"[Pi5 Bridge] Error: Invalid Sequence '{seq}'. Defaulting to RGB.")
                 self.reorder_indices = None
 
-        # --- 2. Hardware Config ---
+        # --- Hardware Config ---
         dither_input = hw_conf['pwm_dither_bits']
         n_temporal = 2 if dither_input == 1 else (4 if dither_input >= 2 else 0)
-
         raw_pwm_bits = hw_conf['pwm_bits']
         n_planes = min(10, max(1, raw_pwm_bits))
-        
-        if hw_conf['row_addr_type'] is not None:
-            n_addr_lines = hw_conf['row_addr_type']
-        else:
-            n_addr_lines = 5 if self.hw_height >= 64 else 4
+        n_addr_lines = hw_conf['row_addr_type'] if hw_conf['row_addr_type'] is not None else (5 if self.hw_height >= 64 else 4)
 
-        # --- 3. Gamma LUT ---
-        gamma = hw_conf['gamma']
-        brightness = hw_conf['brightness'] / 100.0
-        lut = [int(pow(i / 255.0, gamma) * 255.0 * brightness) for i in range(256)]
-        self.gamma_lut = np.array(lut, dtype="uint8")
-
-        # --- 4. Initialize Piomatter ---
-        # Note: We only pass is_native_bgr=True if it is strictly BGR. 
-        # For RBG, GRB, etc, we pass False (Standard Pinout) and swap in software.
         selected_pinout = get_pinout(hw_conf['mapping'], is_native_bgr)
         n_lanes = 2
 
@@ -148,7 +144,6 @@ class PiomatterMatrix(RGBMatrix):
             "n_addr_lines": n_addr_lines, "n_planes": n_planes,
             "n_temporal_planes": n_temporal, "n_lanes": n_lanes
         }
-
         mapping_key = hw_conf['mapping'].replace('-', '_').lower()
         if mapping_key == 'regular':
             geometry_kwargs["map"] = simple_multilane_mapper(self.hw_width, self.hw_height, n_addr_lines, n_lanes)
@@ -163,7 +158,7 @@ class PiomatterMatrix(RGBMatrix):
             geometry=geometry
         )
 
-        # --- 5. Threading ---
+        # --- Threading ---
         self.shared_buffer = np.zeros((self.hw_height, self.hw_width, 3), dtype="uint8")
         self.buffer_lock = threading.Lock()
         self.new_frame_event = threading.Event()
@@ -193,12 +188,11 @@ class PiomatterMatrix(RGBMatrix):
             raw_frame = adapter._last_frame()
 
             with self.buffer_lock:
-                # 1. Apply Gamma & Brightness (Fast Lookup)
-                processed_frame = self.gamma_lut[raw_frame]
+                # 1. Reshade (Apply Linear Brightness + Rescue Mask)
+                processed_frame = self.reshader.reshade(raw_frame)
                 
-                # 2. Apply Software Reordering (If needed for RBG, GRB, etc)
+                # 2. Reorder Color Channels if needed
                 if self.reorder_indices:
-                    # NumPy Fancy Indexing: reshuffles the color axis
                     processed_frame = processed_frame[:, :, self.reorder_indices]
 
                 if not np.array_equal(processed_frame, self.shared_buffer):
@@ -218,7 +212,7 @@ class PiomatterMatrix(RGBMatrix):
 # --- Injection & Launch ---
 RGBMatrixEmulator.RGBMatrix = PiomatterMatrix
 
-print("[Launcher] Starting Gamma-Corrected Scoreboard (Gamma=2.4)...")
+print("[Launcher] Starting Reshader Bridge...")
 try:
     runpy.run_module('main', run_name='__main__')
 except KeyboardInterrupt:
