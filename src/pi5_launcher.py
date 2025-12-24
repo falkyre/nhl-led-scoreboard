@@ -5,6 +5,8 @@ import atexit
 import argparse
 import threading
 import time
+import random
+import math
 
 # 1. Import Target Library
 import RGBMatrixEmulator
@@ -12,6 +14,7 @@ from RGBMatrixEmulator import RGBMatrix
 
 # 2. Import Piomatter Hardware
 import adafruit_blinka_raspberry_pi5_piomatter as piomatter
+from adafruit_blinka_raspberry_pi5_piomatter import Orientation
 from adafruit_blinka_raspberry_pi5_piomatter.pixelmappers import simple_multilane_mapper
 
 # --- Global Registry ---
@@ -31,37 +34,101 @@ def force_cleanup():
 
 atexit.register(force_cleanup)
 
-# --- Argument Parsing Helper ---
-def get_hardware_config():
-    config = {
-        'cols': 64, 'rows': 32, 
-        'mapping': 'regular', 'sequence': 'RGB',
-        'brightness': 100,
-        'pwm_dither_bits': 0, 'row_addr_type': None, 'pwm_bits': 10 
-    }
+# --- 3. ARGUMENT INTERCEPTOR ---
+GLOBAL_HW_CONFIG = {
+    'cols': 64, 'rows': 32, 
+    'mapping': 'regular', 'sequence': 'RGB',
+    'brightness': 100,
+    'pwm_dither_bits': 0, 'row_addr_type': None, 'pwm_bits': 10,
+    'transition_mode': 'none', 
+    'transition_steps': 20,
+    'transition_hold': 1.0, 
+    'transition_threshold': 10,
+    'rotation': piomatter.Orientation.Normal, # Strict naming
+    'serpentine': False
+}
+
+def consume_arguments():
+    global GLOBAL_HW_CONFIG
+    args_to_remove = []
     
+    def get_arg_value(flag, default_type=str):
+        val = None
+        for i, arg in enumerate(sys.argv):
+            if arg.startswith(flag + "="):
+                val = arg.split("=", 1)[1]
+                args_to_remove.append(arg)
+            elif arg == flag:
+                if i + 1 < len(sys.argv):
+                    val = sys.argv[i+1]
+                    args_to_remove.append(arg)
+                    args_to_remove.append(val)
+        if val: return default_type(val)
+        return None
+
+    # --- Extract Flags ---
+    b = get_arg_value("--led-brightness", int)
+    if b is not None: GLOBAL_HW_CONFIG['brightness'] = b
+
+    t_mode = get_arg_value("--led-transition-mode", str)
+    if t_mode: GLOBAL_HW_CONFIG['transition_mode'] = t_mode
+    
+    t_steps = get_arg_value("--led-transition-steps", int)
+    if t_steps: GLOBAL_HW_CONFIG['transition_steps'] = t_steps
+    
+    t_hold = get_arg_value("--led-transition-hold", float)
+    if t_hold is not None: GLOBAL_HW_CONFIG['transition_hold'] = t_hold
+
+    t_thresh = get_arg_value("--led-transition-threshold", int)
+    if t_thresh is not None: GLOBAL_HW_CONFIG['transition_threshold'] = t_thresh
+
+    # --- PIXEL MAPPER PARSING ---
+    mapper_arg = get_arg_value("--led-pixel-mapper", str)
+    if mapper_arg:
+        options = mapper_arg.split(';')
+        for opt in options:
+            opt = opt.strip()
+            if opt == "U-Mapper":
+                GLOBAL_HW_CONFIG['serpentine'] = True
+                print(f"[Pi5 Bridge] Pixel Mapper: U-Mapper (Serpentine=True)")
+            elif opt.startswith("Rotate:"):
+                angle = opt.split(":")[1]
+                if angle == "0":
+                    GLOBAL_HW_CONFIG['rotation'] = piomatter.Orientation.Normal
+                elif angle == "90":
+                    GLOBAL_HW_CONFIG['rotation'] = piomatter.Orientation.CW
+                    print(f"[Pi5 Bridge] Pixel Mapper: Rotate 90 (CW)")
+                elif angle == "180":
+                    GLOBAL_HW_CONFIG['rotation'] = piomatter.Orientation.R180
+                    print(f"[Pi5 Bridge] Pixel Mapper: Rotate 180")
+                elif angle == "270":
+                    GLOBAL_HW_CONFIG['rotation'] = piomatter.Orientation.CCW
+                    print(f"[Pi5 Bridge] Pixel Mapper: Rotate 270 (CCW)")
+            elif opt.startswith("Mirror:"):
+                print(f"[Pi5 Bridge] Warning: Mirror feature ('{opt}') is not available on this hardware.")
+
+    # Hardware Peeking
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--led-cols", type=int)
     parser.add_argument("--led-rows", type=int)
     parser.add_argument("--led-gpio-mapping", type=str)
     parser.add_argument("--led-rgb-sequence", type=str)
-    parser.add_argument("--led-brightness", type=int)
     parser.add_argument("--led-pwm-dither-bits", type=int)
     parser.add_argument("--led-row-addr-type", type=int)
     parser.add_argument("--led-pwm-bits", type=int)
     
-    args, _ = parser.parse_known_args()
-    
-    if args.led_cols: config['cols'] = args.led_cols
-    if args.led_rows: config['rows'] = args.led_rows
-    if args.led_gpio_mapping: config['mapping'] = args.led_gpio_mapping
-    if args.led_rgb_sequence: config['sequence'] = args.led_rgb_sequence
-    if args.led_brightness is not None: config['brightness'] = args.led_brightness
-    if args.led_pwm_dither_bits is not None: config['pwm_dither_bits'] = args.led_pwm_dither_bits
-    if args.led_row_addr_type is not None: config['row_addr_type'] = args.led_row_addr_type
-    if args.led_pwm_bits is not None: config['pwm_bits'] = args.led_pwm_bits
+    known, _ = parser.parse_known_args()
+    if known.led_cols: GLOBAL_HW_CONFIG['cols'] = known.led_cols
+    if known.led_rows: GLOBAL_HW_CONFIG['rows'] = known.led_rows
+    if known.led_gpio_mapping: GLOBAL_HW_CONFIG['mapping'] = known.led_gpio_mapping
+    if known.led_rgb_sequence: GLOBAL_HW_CONFIG['sequence'] = known.led_rgb_sequence
+    if known.led_pwm_dither_bits is not None: GLOBAL_HW_CONFIG['pwm_dither_bits'] = known.led_pwm_dither_bits
+    if known.led_row_addr_type is not None: GLOBAL_HW_CONFIG['row_addr_type'] = known.led_row_addr_type
+    if known.led_pwm_bits is not None: GLOBAL_HW_CONFIG['pwm_bits'] = known.led_pwm_bits
 
-    return config
+    # Clean sys.argv
+    for arg in args_to_remove:
+        if arg in sys.argv: sys.argv.remove(arg)
 
 def get_pinout(mapping_name, is_bgr):
     name = mapping_name.replace('-', '_').lower()
@@ -72,52 +139,59 @@ def get_pinout(mapping_name, is_bgr):
     return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
 
 
-# --- THE RESHADER CLASS ---
+# --- Frame Reshader ---
 class FrameReshader:
-    """
-    Adapts the palette reshading logic to work on full framebuffers.
-    Uses Linear scaling + a 'Floor Clamp' to prevent pixels from vanishing.
-    """
     def __init__(self, brightness_percent):
-        # Store brightness as a float 0.0 - 1.0
         self.brightness = max(0.01, brightness_percent / 100.0) 
 
     def reshade(self, frame):
-        """
-        Takes a raw uint8 frame, scales it by brightness, 
-        and ensures no non-black pixel becomes black.
-        """
-        # 1. Linear Scaling (mimicking the reshader math)
-        # We use float32 for intermediate precision
-        shaded = frame.astype(np.float32) * self.brightness
+        if self.brightness >= 0.99: return frame
         
-        # 2. Convert back to integer (truncating)
+        shaded = frame.astype(np.float32) * self.brightness
         output = shaded.astype(np.uint8)
-
-        # 3. The "Rescue" Mask (Crucial for Low Brightness)
-        # If the original frame had a pixel > 0, but the output is 0,
-        # we force it to 1. This prevents the "missing portions" issue.
-        if self.brightness < 0.1: # Only needed at very low brightness
+        
+        if self.brightness < 0.1:
             mask = (frame > 0) & (output == 0)
             output[mask] = 1
-            
         return output
-
 
 # --- The Threaded Matrix Class ---
 class PiomatterMatrix(RGBMatrix):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        hw_conf = get_hardware_config()
+        hw_conf = GLOBAL_HW_CONFIG
         self.hw_width = hw_conf['cols']
         self.hw_height = hw_conf['rows']
         
-        # --- Initialize Reshader ---
-        print(f"[Pi5 Bridge] Reshader Active | Brightness: {hw_conf['brightness']}%")
+        # --- Configs ---
         self.reshader = FrameReshader(hw_conf['brightness'])
+        self.trans_mode = hw_conf['transition_mode'].lower()
+        self.trans_steps = hw_conf['transition_steps']
+        self.trans_hold = hw_conf['transition_hold']
+        self.trans_threshold = hw_conf['transition_threshold'] / 100.0
+        
+        self.valid_transitions = [
+            'fade', 'fade-in', 'fade-out',
+            'wipe-left', 'wipe-right', 'wipe-up', 'wipe-down',
+            'curtain-open', 'curtain-close', 'clock-cw', 'clock-ccw'
+        ]
+        
+        if 'clock' in self.trans_mode or 'random' in self.trans_mode:
+            y, x = np.mgrid[0:self.hw_height, 0:self.hw_width]
+            cy, cx = self.hw_height / 2.0, self.hw_width / 2.0
+            angles = np.arctan2(y - cy, x - cx) + (np.pi / 2)
+            angles = np.mod(angles, 2 * np.pi) / (2 * np.pi)
+            self.angle_map = angles
+        else:
+            self.angle_map = None
 
-        # --- Sequence Handling ---
+        self.last_logical_frame = np.zeros((self.hw_height, self.hw_width, 3), dtype="uint8")
+        self.last_update_time = time.time()
+        
+        print(f"[Pi5 Bridge] Transition: {self.trans_mode} | Hold: {self.trans_hold}s")
+
+        # --- Sequence ---
         seq = hw_conf['sequence'].upper()
         is_native_bgr = (seq == "BGR")
         is_native_rgb = (seq == "RGB")
@@ -139,11 +213,26 @@ class PiomatterMatrix(RGBMatrix):
         selected_pinout = get_pinout(hw_conf['mapping'], is_native_bgr)
         n_lanes = 2
 
+        # --- GEOMETRY CONSTRUCTION ---
         geometry_kwargs = {
             "width": self.hw_width, "height": self.hw_height,
             "n_addr_lines": n_addr_lines, "n_planes": n_planes,
             "n_temporal_planes": n_temporal, "n_lanes": n_lanes
         }
+        
+        # LOGIC FIX:
+        # If n_addr_lines < 5, we CAN pass rotation and serpentine.
+        # If n_addr_lines >= 5, we CANNOT pass them (driver limitation).
+        if n_addr_lines < 5:
+             geometry_kwargs["rotation"] = hw_conf['rotation']
+             geometry_kwargs["serpentine"] = hw_conf['serpentine']
+        else:
+            # Check if user tried to set them and warn them
+            if hw_conf['rotation'] != piomatter.Orientation.Normal:
+                print(f"[Pi5 Bridge] Warning: Rotation ignored on 5-line panels.")
+            if hw_conf['serpentine']:
+                print(f"[Pi5 Bridge] Warning: Serpentine mapping ignored on 5-line panels.")
+
         mapping_key = hw_conf['mapping'].replace('-', '_').lower()
         if mapping_key == 'regular':
             geometry_kwargs["map"] = simple_multilane_mapper(self.hw_width, self.hw_height, n_addr_lines, n_lanes)
@@ -180,39 +269,118 @@ class PiomatterMatrix(RGBMatrix):
                 except Exception:
                     pass
 
+    def _push_frame(self, frame):
+        out = self.reshader.reshade(frame)
+        if self.reorder_indices:
+            out = out[:, :, self.reorder_indices]
+        with self.buffer_lock:
+            if not np.array_equal(out, self.shared_buffer):
+                np.copyto(self.shared_buffer, out)
+                self.new_frame_event.set()
+
     def SwapOnVSync(self, canvas, framerate_fraction=0):
         new_canvas = super().SwapOnVSync(canvas, framerate_fraction)
 
         try:
             adapter = self.canvas.display_adapter
-            raw_frame = adapter._last_frame()
+            new_frame = adapter._last_frame()
 
-            with self.buffer_lock:
-                # 1. Reshade (Apply Linear Brightness + Rescue Mask)
-                processed_frame = self.reshader.reshade(raw_frame)
+            if np.array_equal(new_frame, self.last_logical_frame):
+                pass 
+            else:
+                now = time.time()
+                time_diff = now - self.last_update_time
                 
-                # 2. Reorder Color Channels if needed
-                if self.reorder_indices:
-                    processed_frame = processed_frame[:, :, self.reorder_indices]
+                changed_pixels = np.count_nonzero(np.any(new_frame != self.last_logical_frame, axis=2))
+                change_pct = changed_pixels / (self.hw_width * self.hw_height)
 
-                if not np.array_equal(processed_frame, self.shared_buffer):
-                    np.copyto(self.shared_buffer, processed_frame)
-                    self.new_frame_event.set()
+                should_transition = False
+                if self.trans_mode != 'none' and self.trans_steps > 1:
+                    if time_diff >= self.trans_hold:
+                        if change_pct >= self.trans_threshold:
+                            should_transition = True
+
+                if should_transition:
+                    self._run_transition(self.last_logical_frame, new_frame)
+                else:
+                    self._push_frame(new_frame)
+                
+                np.copyto(self.last_logical_frame, new_frame)
+                self.last_update_time = now
 
         except Exception as e:
             pass
-
         return new_canvas
+
+    def _run_transition(self, old_frame, new_frame):
+        rows, cols, _ = old_frame.shape
+        steps = self.trans_steps
+        
+        current_mode = self.trans_mode
+        if current_mode == 'random':
+            current_mode = random.choice(self.valid_transitions)
+            
+        if 'fade' in current_mode:
+            f_old = old_frame.astype(np.float32)
+            f_new = new_frame.astype(np.float32)
+
+        for i in range(1, steps + 1):
+            t = i / float(steps)
+            
+            if current_mode == 'fade':
+                final = ((f_old * (1.0 - t)) + (f_new * t)).astype(np.uint8)
+            elif current_mode == 'fade-in':
+                final = (f_new * t).astype(np.uint8)
+            elif current_mode == 'fade-out':
+                final = (f_old * (1.0 - t)).astype(np.uint8)
+            elif current_mode == 'wipe-right':
+                split = int(cols * t)
+                final = old_frame.copy()
+                final[:, :split] = new_frame[:, :split]
+            elif current_mode == 'wipe-left':
+                split = int(cols * (1-t))
+                final = old_frame.copy()
+                final[:, split:] = new_frame[:, split:]
+            elif current_mode == 'wipe-down':
+                split = int(rows * t)
+                final = old_frame.copy()
+                final[:split, :] = new_frame[:split, :]
+            elif current_mode == 'wipe-up':
+                split = int(rows * (1-t))
+                final = old_frame.copy()
+                final[split:, :] = new_frame[split:, :]
+            elif current_mode == 'curtain-open':
+                split = int((cols / 2) * t)
+                center = cols // 2
+                final = old_frame.copy()
+                final[:, center - split : center + split] = new_frame[:, center - split : center + split]
+            elif current_mode == 'curtain-close':
+                split = int((cols / 2) * t)
+                final = old_frame.copy()
+                final[:, :split] = new_frame[:, :split]
+                final[:, cols - split:] = new_frame[:, cols - split:]
+            elif current_mode == 'clock-cw':
+                mask = self.angle_map <= t
+                final = np.where(mask[:, :, None], new_frame, old_frame)
+            elif current_mode == 'clock-ccw':
+                mask = self.angle_map >= (1.0 - t)
+                final = np.where(mask[:, :, None], new_frame, old_frame)
+            else:
+                final = new_frame
+
+            self._push_frame(final)
+            time.sleep(0.01) 
 
     def stop_thread(self):
         self.running = False
         self.new_frame_event.set()
         self.thread.join(timeout=1.0)
 
-# --- Injection & Launch ---
+# --- EXECUTION START ---
+consume_arguments()
 RGBMatrixEmulator.RGBMatrix = PiomatterMatrix
 
-print("[Launcher] Starting Reshader Bridge...")
+print("[Launcher] Starting Scoreboard...")
 try:
     runpy.run_module('main', run_name='__main__')
 except KeyboardInterrupt:

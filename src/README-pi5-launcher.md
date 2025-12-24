@@ -85,6 +85,12 @@ Supported Arguments:
 *   `--led-pwm-bits`: PWM depth (1-10). Default: 10. Lowering this (e.g., to 6-8) can improve refresh rates at the cost of color depth.
 *   `--led-row-addr-type`:  Number of address lines (e.g., 0-5). Useful for panels with different multiplexing.
 *   `--led-pwm-dither-bits`: Amount of dithering to apply (0-2). 0 = no dithering, higher values use more temporal planes.
+*   `--led-pixel-mapper`:  Apply pixel mapping modifications. Supports `U-Mapper` (for serpentine panels) and `Rotate:<angle>` (0, 90, 180, 270). Multiple mappers can be separated by a semicolon (e.g., `U-Mapper;Rotate:180`).
+    *   *Note: Rotation and Serpentine options are only available for panels with < 5 address lines.*
+*   `--led-transition-mode`: Visual transition effect between screen updates. Options: `none` (default), `fade`, `fade-in`, `fade-out`, `wipe-left`, `wipe-right`, `wipe-up`, `wipe-down`, `curtain-open`, `curtain-close`, `clock-cw`, `clock-ccw`, `random`.
+*   `--led-transition-steps`: Number of steps/frames for the transition animation (default: 20).
+*   `--led-transition-hold`: Time (in seconds) to hold the previous frame before starting the transition (default: 1.0).
+*   `--led-transition-threshold`: Percentage of changed pixels required to trigger a transition (0-100, default: 10).
 
 ## Usage
 
