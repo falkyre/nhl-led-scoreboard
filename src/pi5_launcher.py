@@ -44,7 +44,7 @@ GLOBAL_HW_CONFIG = {
     'transition_steps': 20,
     'transition_hold': 1.0, 
     'transition_threshold': 10,
-    'rotation': piomatter.Orientation.Normal, # Strict naming
+    'rotation': piomatter.Orientation.Normal,
     'serpentine': False
 }
 
@@ -327,12 +327,18 @@ class PiomatterMatrix(RGBMatrix):
         for i in range(1, steps + 1):
             t = i / float(steps)
             
+            # --- FADE LOGIC TWEAKED ---
             if current_mode == 'fade':
+                # Cross Dissolve
                 final = ((f_old * (1.0 - t)) + (f_new * t)).astype(np.uint8)
             elif current_mode == 'fade-in':
+                # Black -> New
                 final = (f_new * t).astype(np.uint8)
             elif current_mode == 'fade-out':
+                # Old -> Black
                 final = (f_old * (1.0 - t)).astype(np.uint8)
+
+            # --- WIPES ---
             elif current_mode == 'wipe-right':
                 split = int(cols * t)
                 final = old_frame.copy()
@@ -369,7 +375,12 @@ class PiomatterMatrix(RGBMatrix):
                 final = new_frame
 
             self._push_frame(final)
-            time.sleep(0.01) 
+            time.sleep(0.01)
+
+        # --- CRITICAL FIX ---
+        # Force the final frame to be the clean 'new_frame'.
+        # This fixes "fade-out" hanging on black, and ensures all wipes finish completely.
+        self._push_frame(new_frame)
 
     def stop_thread(self):
         self.running = False
