@@ -132,10 +132,9 @@ def get_pinout(mapping_name, is_bgr):
     use_bgr_variant = is_bgr
     if name == 'regular': return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
     elif name == 'adafruit-hat': return piomatter.Pinout.AdafruitMatrixHatBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixHat
-    elif name == 'adafruit-hat-pwm': return piomatter.Pinout.AdafruitMatrixBonnetBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixBonnet
+    #elif name == 'adafruit-hat-pwm': return piomatter.Pinout.AdafruitMatrixBonnetBGR if use_bgr_variant else piomatter.Pinout.AdafruitMatrixBonnet
 
     return piomatter.Pinout.Active3BGR if use_bgr_variant else piomatter.Pinout.Active3
-
 
 
 

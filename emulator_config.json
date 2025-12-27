@@ -2,7 +2,7 @@
   "pixel_outline": 0,
   "pixel_size": 1,
   "pixel_style": "square",
-  "pixel_glow": 6,
+  "pixel_glow": 0,
   "display_adapter": "raw",
   "icon_path": null,
   "emulator_title": "NHL-LED-SCOREBOARD",
