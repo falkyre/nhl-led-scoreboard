@@ -187,3 +187,5 @@ plugins.lock.json
 nhl_setup
 RELEASE_NOTE.md
 config.html
+emulator_config.json_launcher
+emulator_config-pi5.json

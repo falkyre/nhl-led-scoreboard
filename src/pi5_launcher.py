@@ -44,7 +44,10 @@ GLOBAL_HW_CONFIG = {
     'transition_hold': 1.0, 
     'transition_threshold': 10,
     'rotation': piomatter.Orientation.Normal,
-    'serpentine': False
+    'serpentine': False,
+    'brightness': 100,
+    'color_correction': [1.0, 1.0, 1.0],
+    'control_mode': 'app'
 }
 
 def consume_arguments():
@@ -77,6 +80,29 @@ def consume_arguments():
 
     t_thresh = get_arg_value("--led-transition-threshold", int)
     if t_thresh is not None: GLOBAL_HW_CONFIG['transition_threshold'] = t_thresh
+
+    # --- BRIGHTNESS & COLOR ---
+    # Brightness (0-100)
+    b_val = get_arg_value("--led-brightness", int)
+    if b_val is not None: 
+        GLOBAL_HW_CONFIG['brightness'] = max(0, min(100, b_val))
+
+    # Control Mode ('launcher' or 'app')
+    c_mode = get_arg_value("--led-control-mode", str)
+    if c_mode: 
+        if c_mode.lower() in ['launcher', 'app']:
+            GLOBAL_HW_CONFIG['control_mode'] = c_mode.lower()
+
+    # Color Correction ("R:G:B" floats)
+    cc_val = get_arg_value("--led-color-correction", str)
+    if cc_val:
+        try:
+            parts = [float(x) for x in cc_val.split(':')]
+            if len(parts) == 3:
+                GLOBAL_HW_CONFIG['color_correction'] = parts
+                print(f"[Pi5 Bridge] Color Correction: {parts}")
+        except ValueError:
+            print(f"[Pi5 Bridge] Warning: Invalid color correction format. Use R:G:B (e.g. 1.0:1.0:1.0)")
 
     # --- PIXEL MAPPER PARSING ---
     mapper_arg = get_arg_value("--led-pixel-mapper", str)
@@ -173,6 +199,27 @@ class PiomatterMatrix(RGBMatrix):
         
         print(f"[Pi5 Bridge] Transition: {self.trans_mode} | Hold: {self.trans_hold}s")
 
+        # --- Brightness & Color & Gamma ---
+        self.control_mode = hw_conf['control_mode']
+        self.target_brightness = hw_conf['brightness']
+        self.color_correction = hw_conf['color_correction']
+        
+        # We'll cache the active brightness to detect changes
+        self.current_brightness = None 
+        # Inherit base class brightness if in app mode, but start with config
+        if hasattr(self, 'brightness'):
+            # If the emulator/base set a value, track it. 
+            # Note: RGBMatrixEmulator might initialize self.brightness. 
+            # We assume 100 if not set.
+            pass
+
+        # Gamma LUTs (Lookup Tables)
+        # We will generate these on the fly if brightness/color changes.
+        self.gamma_luts = [None, None, None]
+        self._update_luts(self.target_brightness)
+
+
+
         # --- Sequence ---
         seq = hw_conf['sequence'].upper()
         is_native_bgr = (seq == "BGR")
@@ -259,9 +306,26 @@ class PiomatterMatrix(RGBMatrix):
                     pass
 
     def _push_frame(self, frame):
-        out = frame
+        # 1. Determine active brightness
+        if self.control_mode == 'app':
+            # Check native property (set by NHL-LED-Scoreboard via RGBMatrixEmulator)
+            # RGBMatrixEmulator usually stores it in self.brightness (0-100)
+            app_brightness = getattr(self, 'brightness', 10000) # Assuming 100 if missing
+            if app_brightness != self.current_brightness:
+                self._update_luts(app_brightness)
+        
+        # 2. Apply Look-Up Tables (Gamma + Brightness + Color)
+        # frame is (H, W, 3). We apply LUTs per channel.
+        # This is efficient in NumPy.
+        out = np.empty_like(frame)
+        out[:, :, 0] = self.gamma_luts[0][frame[:, :, 0]]
+        out[:, :, 1] = self.gamma_luts[1][frame[:, :, 1]]
+        out[:, :, 2] = self.gamma_luts[2][frame[:, :, 2]]
+
+        # 3. Reorder for Hardware (if needed, e.g. RBG)
         if self.reorder_indices:
             out = out[:, :, self.reorder_indices]
+            
         with self.buffer_lock:
             if not np.array_equal(out, self.shared_buffer):
                 np.copyto(self.shared_buffer, out)
@@ -375,6 +439,33 @@ class PiomatterMatrix(RGBMatrix):
         self.running = False
         self.new_frame_event.set()
         self.thread.join(timeout=1.0)
+
+    def _update_luts(self, brightness_val):
+        """Re-calculates the 3-channel Gamma Correction LUT based on brightness & color correction."""
+        # Standard Gamma for LEDs is often 2.2 to 2.8. 
+        # We'll stick to 2.2 as a safe default for "rich" colors.
+        gamma = 2.2
+        
+        # brightness_val is 0-100. Convert to 0.0-1.0
+        b_factor = brightness_val / 100.0
+        
+        # Create a linear ramp 0-255
+        raw_ramp = np.arange(256, dtype=np.float32) / 255.0
+        
+        for ch in range(3): # R, G, B
+            # 1. Apply Color Correction (White Balance)
+            scale = self.color_correction[ch]
+            
+            # 2. Apply Brightness
+            linear = raw_ramp * scale * b_factor
+            
+            # 3. Apply Gamma Curve
+            corrected = np.power(linear, gamma) * 255.0
+            
+            # Clip and cast
+            self.gamma_luts[ch] = np.clip(corrected, 0, 255).astype(np.uint8)
+            
+        self.current_brightness = brightness_val
 
 # --- EXECUTION START ---
 consume_arguments()

@@ -81,16 +81,25 @@ Supported Arguments:
 *   `--led-rows`: Number of rows (default: 32)
 *   `--led-gpio-mapping`: Pinout mapping. Options: `regular`, `adafruit-hat`.
 *   `--led-rgb-sequence`: Color sequence (e.g., `RGB`, `BGR`, `RBG`). The launcher handles software reordering if the hardware doesn't support it natively.
-*   `--led-brightness`: Brightness (0-100). **Note:** This is simulated in software (gamma correction), not hardware. Values below 25 may result in poor color/image reproduction.
 *   `--led-pwm-bits`: PWM depth (1-10). Default: 10. Lowering this (e.g., to 6-8) can improve refresh rates at the cost of color depth.
 *   `--led-row-addr-type`:  Number of address lines (e.g., 0-5). Useful for panels with different multiplexing.
 *   `--led-pwm-dither-bits`: Amount of dithering to apply (0-2). 0 = no dithering, higher values use more temporal planes.
 *   `--led-pixel-mapper`:  Apply pixel mapping modifications. Supports `U-Mapper` (for serpentine panels) and `Rotate:<angle>` (0, 90, 180, 270). Multiple mappers can be separated by a semicolon (e.g., `U-Mapper;Rotate:180`).
     *   *Note: Rotation and Serpentine options are only available for panels with < 5 address lines.*
-*   `--led-transition-mode`: Visual transition effect between screen updates. Options: `none` (default), `fade`, `fade-in`, `fade-out`, `wipe-left`, `wipe-right`, `wipe-up`, `wipe-down`, `curtain-open`, `curtain-close`, `clock-cw`, `clock-ccw`, `random`.
-*   `--led-transition-steps`: Number of steps/frames for the transition animation (default: 20).
-*   `--led-transition-hold`: Time (in seconds) to hold the previous frame before starting the transition (default: 1.0).
-*   `--led-transition-threshold`: Percentage of changed pixels required to trigger a transition (0-100, default: 10).
+
+### Brightness & Color Control
+*   `--led-brightness`: (Integer 0-100) Sets the global brightness. 
+*   `--led-color-correction`: (Format `R:G:B`) Adjusts the color balance. Useful if your panel behaves tinty. Example: `--led-color-correction=1.0:0.9:0.7` to reduce Green and Blue intensity.
+*   `--led-control-mode`: ( `app` | `launcher` ) Defines who controls the brightness.
+    *   `app` (Default): The NHL Scoreboard application controls brightness (e.g. via config or web UI).
+    *   `launcher`: The `--led-brightness` flag set here overrides the application setting.
+
+### Transition Effects
+*   `--led-transition-mode`: Selects the transition effect. Options: `fade`, `fade-in`, `fade-out`, `wipe-left`, `wipe-right`, `wipe-up`, `wipe-down`, `curtain-open`, `curtain-close`, `clock-cw`, `clock-ccw`, `random`.
+*   `--led-transition-steps`: Number of frames for the transition (default: 20).
+*   `--led-transition-hold`: Seconds to hold the image before transitioning (default: 1.0).
+*   `--led-transition-threshold`: Percentage of pixel change required to trigger a transition (default: 10).
+
 
 ## Usage
 
@@ -98,6 +107,12 @@ To start the scoreboard on a Raspberry Pi 5:
 
 ```bash
 sudo python3 pi5_launcher.py
+```
+
+**Example with Brightness Control:**
+To force the brightness to 50% and tint the display slightly red (reducing blue/green):
+```bash
+sudo python3 pi5_launcher.py --led-control-mode=launcher --led-brightness=50 --led-color-correction=1.0:0.8:0.8
 ```
 
 *Note: `sudo` is typically required for hardware GPIO access.*
