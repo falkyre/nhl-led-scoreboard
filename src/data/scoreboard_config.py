@@ -72,8 +72,8 @@ class ScoreboardConfig:
                 self.mqtt_main_topic = "scoreboard"
 
             try:
-                self.mqtt_username = json["mqtt"]["auth"]["username"]
-                self.mqtt_password = json["mqtt"]["auth"]["password"]
+                self.mqtt_username = json["sbio"]["mqtt"]["auth"]["username"]
+                self.mqtt_password = json["sbio"]["mqtt"]["auth"]["password"]
             except KeyError:
                 pass
 
