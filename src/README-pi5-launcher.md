@@ -107,6 +107,12 @@ Supported Arguments:
 *   `--led-transition-hold`: Seconds to hold the image before transitioning (default: 1.0).
 *   `--led-transition-threshold`: Percentage of pixel change required to trigger a transition (default: 10).
 
+### Color Test
+### Color Test
+*   `--led-color-test`: Displays a simple color test pattern (Red, Green, Blue squares with labels) to verify the matrix connection and orientation. 
+    *   **Interactive Mode**: While running the test, keys `r`/`R`, `g`/`G`, and `b`/`B` can be used to adjust the color correction values in real-time. Keys `v`/`V` adjust the brightness. Key `0` resets the color correction. The new values are displayed on the matrix.
+    *   **Exit**: Press `CTRL-C` to exit. The tool will print the final configuration flags needed to apply your settings permanently.
+
 
 ## Usage
 
@@ -120,6 +126,12 @@ sudo python3 pi5_launcher.py
 To force the brightness to 50% and tint the display slightly red (reducing blue/green):
 ```bash
 sudo python3 pi5_launcher.py --led-control-mode=launcher --led-brightness=50 --led-color-correction=1.0:0.8:0.8
+```
+
+**Example Color Test:**
+To verify your matrix colors and orientation:
+```bash
+sudo python3 pi5_launcher.py --led-color-test --led-cols=64 --led-rows=32
 ```
 
 *Note: `sudo` is typically required for hardware GPIO access.*

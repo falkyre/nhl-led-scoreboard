@@ -467,16 +467,226 @@ class PiomatterMatrix(RGBMatrix):
             
         self.current_brightness = brightness_val
 
+
+def run_color_test():
+    """Displays a simple color test pattern (R, G, B) with labels."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import tty
+        import termios
+    except ImportError as e:
+        print(f"[Pi5 Bridge] Error: Missing dependencies for color test ({e}). Please install them.")
+        return
+
+    print("[Pi5 Bridge] Starting Color Test Mode...")
+    print("Controls: r/R (Red), g/G (Green), b/B (Blue) to adjust. CTRL-C to exit.")
+    
+    # Initialize Matrix
+    # We need to pass an options object that mimics RGBMatrixOptions
+    class MockOptions:
+        def __init__(self):
+            self.cols = GLOBAL_HW_CONFIG['cols']
+            self.rows = GLOBAL_HW_CONFIG['rows']
+            self.chain_length = 1
+            self.parallel = 1
+            self.pwm_bits = 11
+            self.brightness = GLOBAL_HW_CONFIG['brightness']
+            self.pwm_lsb_nanoseconds = 130
+            self.led_rgb_sequence = "RGB"
+            self.pixel_mapper_config = ""
+            self.panel_type = ""
+            self.drop_privileges = False
+            self.gpio_slowdown = 1
+            self.daemon = False
+            self.drop_privileges = False
+
+    options = MockOptions()
+    matrix = PiomatterMatrix(options=options)
+    
+    # Create Image
+    width, height = matrix.hw_width, matrix.hw_height
+    
+    # Calculate Dimensions
+    row_h = height // 4
+    # Use similar width to the old squares for the gradient bar
+    bar_width = int(row_h * 0.8)
+    padding = int(row_h * 0.1)
+    
+    try:
+        # Try to load a font, otherwise use default
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", int(row_h * 0.6))
+    except:
+        font = ImageFont.load_default()
+
+    def draw_test_pattern():
+        image = Image.new("RGB", (width, height), (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        
+        # 1. Draw Grayscale Gradient Bar (Left Side)
+        # We want a gradient from White (top) to Black (bottom) for checking tint at all intensities.
+        x_start = padding
+        x_end = padding + bar_width
+        
+        y_grad_start = padding
+        y_grad_end = height - padding
+        grad_height = y_grad_end - y_grad_start
+        
+        if grad_height > 0:
+            for y in range(grad_height):
+                # Value goes from 255 (top) to 0 (bottom)
+                val = int(255 * (1.0 - (y / grad_height)))
+                # Draw a horizontal line for this y
+                draw.line([(x_start, y_grad_start + y), (x_end, y_grad_start + y)], fill=(val, val, val))
+
+        # 2. Draw Labels with current correction values
+        # Format: (Text, ValueIndex, Color)
+        items = [
+            ("R:", 0, (255, 0, 0)),
+            ("G:", 1, (0, 255, 0)),
+            ("B:", 2, (0, 0, 255))
+        ]
+
+        text_x = padding + bar_width + padding # Right of the bar
+
+        for i, (text, val_idx, color) in enumerate(items):
+            y_start = i * row_h
+            
+            # Draw Text centered in its row
+            val = matrix.color_correction[val_idx]
+            label = f"{text} {val:.1f}"
+            
+            # Centering text vertically in the row roughly
+            text_y = y_start + (row_h - int(row_h * 0.6)) // 2 
+            
+            draw.text((text_x, text_y), label, font=font, fill=color)
+        
+        # 3. Draw Brightness Label in 4th row
+        b_val = matrix.target_brightness
+        label_bright = f"BR: {b_val}"
+        
+        y_start = 3 * row_h
+        text_y = y_start + (row_h - int(row_h * 0.6)) // 2
+        
+        draw.text((text_x, text_y), label_bright, font=font, fill=(150, 150, 150))
+        
+        return np.array(image)
+
+    # --- Helper for Key Input ---
+    def get_key():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
+    # --- Initial Setup ---
+    # Draw initial frame
+    frame = draw_test_pattern()
+    matrix._push_frame(frame)
+    
+    # Show initial correction
+    cc = matrix.color_correction
+    print(f"Current Correction: R:{cc[0]:.1f} G:{cc[1]:.1f} B:{cc[2]:.1f} Bright:{matrix.target_brightness}   ", end="", flush=True)
+
+    # Loop with Input
+    try:
+        while True:
+             # Wait for key
+            key = get_key()
+            if ord(key) == 3: # CTRL-C
+                raise KeyboardInterrupt
+            
+            # Adjust values
+            step = 0.1
+            changed = False
+            
+            if key == 'r':
+                matrix.color_correction[0] -= step
+                changed = True
+            elif key == 'R':
+                matrix.color_correction[0] += step
+                changed = True
+            elif key == 'g':
+                matrix.color_correction[1] -= step
+                changed = True
+            elif key == 'G':
+                matrix.color_correction[1] += step
+                changed = True
+            elif key == 'b':
+                matrix.color_correction[2] -= step
+                changed = True
+            elif key == 'B':
+                matrix.color_correction[2] += step
+                changed = True
+            elif key == '0': # Reset
+                matrix.color_correction = [1.0, 1.0, 1.0]
+                changed = True
+            elif key == 'v': # Brightness Down
+                matrix.target_brightness = max(0, matrix.target_brightness - 5)
+                changed = True
+            elif key == 'V': # Brightness Up
+                matrix.target_brightness = min(100, matrix.target_brightness + 5)
+                changed = True
+            
+            if changed:
+                # Clamp and update
+                for i in range(3):
+                    matrix.color_correction[i] = max(0.0, matrix.color_correction[i])
+                
+                # Update hardware LUTS
+                matrix._update_luts(matrix.target_brightness)
+                
+                # Redraw frame with new values
+                frame = draw_test_pattern()
+                
+                # Re-push frame to apply new LUTs
+                matrix._push_frame(frame)
+                
+                # Update Text
+                cc = matrix.color_correction
+                print(f"\rCurrent Correction: R:{cc[0]:.1f} G:{cc[1]:.1f} B:{cc[2]:.1f} Bright:{matrix.target_brightness}   ", end="", flush=True)
+
+    except KeyboardInterrupt:
+        print("\n\n[Pi5 Bridge] Test Ended.")
+        cc = matrix.color_correction
+        print(f"To use these settings, add these flags to your command:")
+        print(f"  --led-color-correction={cc[0]:.1f}:{cc[1]:.1f}:{cc[2]:.1f}")
+        print(f"  --led-brightness={matrix.target_brightness}")
+        print("")
+
+    finally:
+        matrix.stop_thread()
+        print("")
+
+
+
 # --- EXECUTION START ---
 consume_arguments()
-RGBMatrixEmulator.RGBMatrix = PiomatterMatrix
 
-print("[Launcher] Starting Scoreboard...")
-try:
-    runpy.run_module('main', run_name='__main__')
-except KeyboardInterrupt:
-    print("\n[Launcher] CTRL-C detected.")
-except Exception as e:
-    print(f"[Launcher] Error: {e}")
-finally:
-    force_cleanup()
+# Check for Color Test Flag
+is_color_test = False
+for arg in sys.argv:
+    if arg == "--led-color-test":
+        is_color_test = True
+        break
+
+if is_color_test:
+    # Remove the flag so it doesn't mess up anything else potentially, though we aren't running main
+    if "--led-color-test" in sys.argv:
+        sys.argv.remove("--led-color-test")
+    run_color_test()
+else:
+    RGBMatrixEmulator.RGBMatrix = PiomatterMatrix
+    
+    print("[Launcher] Starting Scoreboard...")
+    try:
+        runpy.run_module('main', run_name='__main__')
+    except KeyboardInterrupt:
+        print("\n[Launcher] CTRL-C detected.")
+    except Exception as e:
+        print(f"[Launcher] Error: {e}")
+    finally:
+        force_cleanup()
