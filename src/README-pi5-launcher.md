@@ -4,7 +4,7 @@ This launcher (`pi5_launcher.py`) is a specialized bridge that enables the **NHL
 
 Because the Raspberry Pi 5 uses a new hardware architecture (RP1) for GPIO, the standard `rpi-rgb-led-matrix` library (and its Python bindings) does not currently support it directly. 
 
-This solution uses **[Adafruit's Piomatter](https://github.com/adafruit/Adafruit_CircuitPython_PioMatter)** library to drive the matrix via the RP1's PIO (Programmable I/O) state machines, "bridged" through the **RGBMatrixEmulator**.
+This solution uses **[Adafruit's Blinka Raspberry Pi 5 Piomatter](https://github.com/adafruit/Adafruit_Blinka_Raspberry_Pi5_Piomatter)** library to drive the matrix via the RP1's PIO (Programmable I/O) state machines, "bridged" through the **RGBMatrixEmulator**.
 
 ## How It Works
 
@@ -17,10 +17,17 @@ This solution uses **[Adafruit's Piomatter](https://github.com/adafruit/Adafruit
 Ensure you have the following installed (these are included in `requirements-pi5.txt`):
 
 *   **Python 3**
+*   **Python 3 virtual environment**: To isolate dependencies.
 *   **Adafruit-Blinka-Raspberry-Pi5-Piomatter**: The hardware driver for Pi 5.
 *   **RGBMatrixEmulator**: The matrix emulation layer.
 *   **NumPy**: For efficient frame buffer manipulation.
 *   **Adafruit-Blinka**: CircuitPython hardware compatibility layer.
+*   **OS Packages**: Packages that the nhl-led-scoreboard depends on. These are included in `apt-requirements` and can be installed using the `scripts/sbtools/aptfile` script.
+
+> [!IMPORTANT]
+> Do **NOT** install the `rpi-rgb-led-matrix` library. It is not compatible with the Raspberry Pi 5.  Do not run the `scripts/install.sh` script.  It will install the `rpi-rgb-led-matrix` library.  An new install.sh will be created for the Pi5 at a future time.
+
+To install the required dependencies, run in your virtual environment:
 
 ```bash
 pip3 install -r requirements-pi5.txt
