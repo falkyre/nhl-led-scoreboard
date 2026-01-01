@@ -73,7 +73,7 @@ Ensure the following key settings are present:
 ```
 
 *   `display_adapter`: **MUST** be set to `"raw"` for the bridge to work.
-*   `pixel_style`: Can be set to `"real"` (no effects) for best performance.
+*   `pixel_style`: Can be ignored.  Any pixel settings are not applied for the `"raw"` display adapter.
 
 ### Hardware Configuration
 
