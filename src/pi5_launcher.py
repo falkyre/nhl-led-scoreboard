@@ -249,22 +249,28 @@ class PiomatterMatrix(RGBMatrix):
             "n_temporal_planes": n_temporal
         }
         
-        # LOGIC FIX:
-        # If n_addr_lines < 5, we CAN pass rotation and serpentine.
-        # If n_addr_lines >= 5, we CANNOT pass them (driver limitation).
-        if n_addr_lines < 5:
-             geometry_kwargs["rotation"] = hw_conf['rotation']
-             geometry_kwargs["serpentine"] = hw_conf['serpentine']
-        else:
-            # Check if user tried to set them and warn them
-            if hw_conf['rotation'] != piomatter.Orientation.Normal:
-                print(f"[Pi5 Bridge] Warning: Rotation ignored on 5-line panels.")
-            if hw_conf['serpentine']:
-                print(f"[Pi5 Bridge] Warning: Serpentine mapping ignored on 5-line panels.")
-
+        # Determine Map first
         mapping_key = hw_conf['mapping'].replace('-', '_').lower()
         if mapping_key == 'regular':
             geometry_kwargs["map"] = simple_multilane_mapper(self.hw_width, self.hw_height, n_addr_lines, n_lanes)
+
+        # LOGIC FIX:
+        # If we have a map, we CANNOT pass rotation or serpentine (constructor conflict).
+        # If we don't have a map, we can pass them IF n_addr_lines < 5.
+        if "map" not in geometry_kwargs:
+            if n_addr_lines < 5:
+                 geometry_kwargs["rotation"] = hw_conf['rotation']
+                 geometry_kwargs["serpentine"] = hw_conf['serpentine']
+            else:
+                if hw_conf['rotation'] != piomatter.Orientation.Normal:
+                    print(f"[Pi5 Bridge] Warning: Rotation ignored on 5-line panels.")
+                if hw_conf['serpentine']:
+                    print(f"[Pi5 Bridge] Warning: Serpentine mapping ignored on 5-line panels.")
+        else:
+             if hw_conf['rotation'] != piomatter.Orientation.Normal:
+                 print(f"[Pi5 Bridge] Warning: Hardware rotation ignored when using custom mapping.")
+             if hw_conf['serpentine']:
+                 print(f"[Pi5 Bridge] Warning: Serpentine flag ignored when using custom mapping.")
 
         # --- DEBUG INFO ---
         debug_geo = geometry_kwargs.copy()
@@ -674,6 +680,11 @@ for arg in sys.argv:
         break
 
 if is_color_test:
+    # FORCE LAUNCHER MODE so that brightness/color changes are applied visualy
+    # The default 'app' mode expects the running app to set them, which doesn't happen during a test.
+    GLOBAL_HW_CONFIG['control_mode'] = 'launcher'
+    print("[Pi5 Bridge] Forcing Launcher Mode for Color Test")
+
     # Remove the flag so it doesn't mess up anything else potentially, though we aren't running main
     if "--led-color-test" in sys.argv:
         sys.argv.remove("--led-color-test")
