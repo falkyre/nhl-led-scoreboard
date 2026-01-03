@@ -175,6 +175,10 @@ class MainRenderer:
                 debug.info("Game is Live")
                 if self.data.config.mqtt_enabled:
                     # Add game state onto queue
+                    qPayload = "intermission" if self.scoreboard.intermission else "live"
+                    qItem = ["{0}/state".format(self.data.config.mqtt_main_topic), qPayload]
+                    self.sbQueue.put_nowait(qItem)
+                    # Add game state onto queue
                     qPayload = {"period": period, "clock": clock,"score": score}
                     qItem = ["{0}/live/status".format(self.data.config.mqtt_main_topic),qPayload]
                     self.sbQueue.put_nowait(qItem)
@@ -186,11 +190,6 @@ class MainRenderer:
                 self.__render_live(sbrenderer)
                 if self.scoreboard.intermission:
                     debug.info("Main event is in Intermission")
-                    if self.data.config.mqtt_enabled:
-                        # Add game state onto queue
-                        qPayload = "intermission"
-                        qItem = ["{0}/state".format(self.data.config.mqtt_main_topic),qPayload]
-                        self.sbQueue.put_nowait(qItem)  
 
                     # Show Boards for Intermission
                     self.draw_end_period_indicator()
