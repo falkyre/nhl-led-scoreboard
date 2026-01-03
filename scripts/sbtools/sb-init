@@ -44,6 +44,12 @@ if [ "$ARCH" = "armv6l" ]; then
   exit 1
 fi
 
+# Check for Raspberry Pi 5
+IS_PI5=false
+if grep -q "Raspberry Pi 5" /proc/device-tree/model 2>/dev/null; then
+  IS_PI5=true
+fi
+
 # Don't run as root
 if [ $(id -u) -eq 0 ]; then
   tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
@@ -78,7 +84,7 @@ fi
 if $(dpkg --compare-versions $(py_ver) "gt" "3.10.0"); then
   tput bold; echo "$(tput setaf 2)Creating python virtual environment...$(tput setaf 9)" ; tput sgr0
 
-  # Install virtual enviroment, required for upcoming bookworm release
+  # Install virtual environment, required for upcoming bookworm release
   # Use already installed site-packages that were installed as part o fthe apt OS dependencies
   python3 -m venv $HOME/nhlsb-venv --system-site-packages
 
@@ -115,8 +121,14 @@ TEXT0
   #Install all pip3 requirements using the requirements.txt file
   #This will install into the virtual environment
 
+  
   tput bold; echo "$(tput setaf 2)Installing scoreboard python requirements in virtual environment...$(tput setaf 9)" ; tput sgr0
+  if [ "$IS_PI5" = true ]; then
+  tput bold; echo "$(tput setaf 2)Installing requirements for Raspberry Pi 5...$(tput setaf 9)" ; tput sgr0
+  pip3 install -r requirements-pi5.txt
+else
   pip3 install -U -r requirements.txt
+fi
 
   # Check the exit code of the command above
   if [ $? -ne 0 ]; then
@@ -139,33 +151,42 @@ else
       exit 1
   fi
 fi
-# Pull submodule and ignore changes from script
-git submodule update --init --recursive
-git config submodule.matrix.ignore all
+if [ "$IS_PI5" = false ]; then
+    # Pull submodule and ignore changes from script
+    git submodule update --init --recursive
+    git config submodule.matrix.ignore all
 
-tput bold; echo "$(tput setaf 4)Running rgbmatrix installation...$(tput setaf 9)" ; tput sgr0
+    tput bold; echo "$(tput setaf 4)Running rgbmatrix installation...$(tput setaf 9)" ; tput sgr0
 
-# No longer needed for newer version of the rgb matric repo as of Dec 2021
-# Recompile the cpp files to build library with newest cython.  See https://github.com/hzeller/rpi-rgb-led-matrix/issues/1298
+    # No longer needed for newer version of the rgb matric repo as of Dec 2021
+    # Recompile the cpp files to build library with newest cython.  See https://github.com/hzeller/rpi-rgb-led-matrix/issues/1298
 
-cd submodules/matrix/ || exit
+    cd submodules/matrix/ || exit
 
-# python3 -m pip install --no-cache-dir cython
-# python3 -m cython -2 --cplus *.pyx
+    # python3 -m pip install --no-cache-dir cython
+    # python3 -m cython -2 --cplus *.pyx
 
-# cd ../../ || exit
+    # cd ../../ || exit
 
-make build-python PYTHON="$(command -v python3)"
+    make build-python PYTHON="$(command -v python3)"
 
-if [ -n "$VIRTUAL_ENV" ]; then
-  #make install-python PYTHON="$(command -v python3)"
-  # The --use-pep517 is required for newer versions of pip to install the package correctly
-  pip3 install bindings/python/ --use-pep517
+    if [ -n "$VIRTUAL_ENV" ]; then
+      #make install-python PYTHON="$(command -v python3)"
+      # The --use-pep517 is required for newer versions of pip to install the package correctly
+      pip3 install bindings/python/ --use-pep517
+    else
+      sudo pip3 install bindings/python/ --use-pep517
+    fi
+
+    cd ../../ || exit
 else
-  sudo pip3 install bindings/python/ --use-pep517
+    # Raspberry Pi 5 specific setup
+    if [ ! -f /etc/udev/rules.d/99-com.rules ]; then
+        tput bold; echo "$(tput setaf 2)Creating udev rules for Raspberry Pi 5...$(tput setaf 9)" ; tput sgr0
+        echo 'SUBSYSTEM=="*-pio", GROUP="gpio", MODE="0660"' | sudo tee /etc/udev/rules.d/99-com.rules > /dev/null
+        tput bold; echo "$(tput setaf 1)IMPORTANT: You will need to REBOOT before using the LED Matrix module!$(tput setaf 9)" ; tput sgr0
+    fi
 fi
-
-cd ../../ || exit
 
 tput bold; echo "$(tput setaf 4)Blacklisting sound module...$(tput setaf 9)" ; tput sgr0
 # Blacklist the snd_bcm2835 sounds module

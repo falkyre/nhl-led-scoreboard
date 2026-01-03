@@ -14,6 +14,15 @@ This solution uses **[Adafruit's Blinka Raspberry Pi 5 Piomatter](https://github
 
 ## Prerequisites
 
+### Hardware
+
+*   **Raspberry Pi 5**
+*   **RGB LED Matrix** (Adafruit Panels are recommended. 128x64 size works best with the nhl-led-scoreboard)
+*   **RPi5 Power Supply** (Must supply direct to rpi5 and not power from Bonnet or HAT)
+*   **RGB LED Matrix Power Supply** (Must supply direct to matrix)
+
+### Software
+
 Ensure you have the following installed (these are included in `requirements-pi5.txt`):
 
 *   **Python 3**
@@ -24,7 +33,10 @@ Ensure you have the following installed (these are included in `requirements-pi5
 *   **Adafruit-Blinka**: CircuitPython hardware compatibility layer.
 *   **OS Packages**: Packages that the nhl-led-scoreboard depends on. These are included in `apt-requirements` and can be installed using the `scripts/sbtools/aptfile` script.
 
-> [!IMPORTANT]
+> [!TIP]
+> You can use the `"scripts/sbtools/sb-init"` script to install the required dependencies.  It will create the virtual environment and install the required packages as well as the udev rules for the pi5.
+
+> [!CAUTION]
 > Do **NOT** install the `rpi-rgb-led-matrix` library. It is not compatible with the Raspberry Pi 5.  Do not run the `scripts/install.sh` script.  It will install the `rpi-rgb-led-matrix` library.  An new install.sh will be created for the Pi5 at a future time.
 
 To install the required dependencies, run in your virtual environment:
@@ -97,8 +109,8 @@ Supported Arguments:
 ### Brightness & Color Control
 *   `--led-brightness`: (Integer 0-100) Sets the global brightness. 
 *   `--led-color-correction`: (Format `R:G:B`) Adjusts the color balance. Useful if your panel behaves tinty. Example: `--led-color-correction=1.0:0.9:0.7` to reduce Green and Blue intensity.
-*   `--led-control-mode`: ( `app` | `launcher` ) Defines who controls the brightness.
-    *   `app` (Default): The NHL Scoreboard application controls brightness (e.g. via config or web UI).
+*   `--led-control-mode`: ( `rgbme` | `launcher` ) Defines who controls the brightness.
+    *   `rgbme` (Default): The RGBMatrixEmulator controls brightness.
     *   `launcher`: The `--led-brightness` flag set here overrides the application setting.
 
 ### Transition Effects

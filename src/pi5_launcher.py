@@ -47,7 +47,8 @@ GLOBAL_HW_CONFIG = {
     'serpentine': False,
     'brightness': 100,
     'color_correction': [1.0, 1.0, 1.0],
-    'control_mode': 'app'
+
+    'control_mode': 'rgbme'
 }
 
 def consume_arguments():
@@ -86,11 +87,12 @@ def consume_arguments():
     b_val = get_arg_value("--led-brightness", int)
     if b_val is not None: 
         GLOBAL_HW_CONFIG['brightness'] = max(0, min(100, b_val))
+        GLOBAL_HW_CONFIG['brightness_explicit'] = True
 
-    # Control Mode ('launcher' or 'app')
+    # Control Mode ('launcher' or 'rgbme')
     c_mode = get_arg_value("--led-control-mode", str)
     if c_mode: 
-        if c_mode.lower() in ['launcher', 'app']:
+        if c_mode.lower() in ['launcher', 'rgbme']:
             GLOBAL_HW_CONFIG['control_mode'] = c_mode.lower()
 
     # Color Correction ("R:G:B" floats)
@@ -207,13 +209,18 @@ class PiomatterMatrix(RGBMatrix):
         # We'll cache the active brightness to detect changes
         self.current_brightness = None 
         # Inherit base class brightness if in app mode, but start with config
+
+
         if hasattr(self, 'brightness'):
             # If the emulator/base set a value, track it. 
             # Note: RGBMatrixEmulator might initialize self.brightness. 
             # We assume 100 if not set.
+            if self.control_mode == 'rgbme' and hw_conf.get('brightness_explicit'):
+                # Force the base class to respect the CLI arg, 
+                # otherwise it defaults to 100 and overrides us in _push_frame
+                self.brightness = self.target_brightness
+                print(f"[Pi5 Bridge] Forcing App Brightness to CLI value: {self.brightness}")
             pass
-
-        # Gamma LUTs (Lookup Tables)
         # We will generate these on the fly if brightness/color changes.
         self.gamma_luts = [None, None, None]
         self._update_luts(self.target_brightness)
@@ -313,7 +320,7 @@ class PiomatterMatrix(RGBMatrix):
 
     def _push_frame(self, frame):
         # 1. Determine active brightness
-        if self.control_mode == 'app':
+        if self.control_mode == 'rgbme':
             # Check native property (set by NHL-LED-Scoreboard via RGBMatrixEmulator)
             # RGBMatrixEmulator usually stores it in self.brightness (0-100)
             app_brightness = getattr(self, 'brightness', 10000) # Assuming 100 if missing
@@ -485,7 +492,7 @@ def run_color_test():
         return
 
     print("[Pi5 Bridge] Starting Color Test Mode...")
-    print("Controls: r/R (Red), g/G (Green), b/B (Blue) to adjust. CTRL-C to exit.")
+    print("Controls: r/R (Red), g/G (Green), b/B (Blue) to adjust color. -/+ to adjust brightness. CTRL-C to exit.")
     
     # Initialize Matrix
     # We need to pass an options object that mimics RGBMatrixOptions
@@ -515,7 +522,7 @@ def run_color_test():
     # Calculate Dimensions
     row_h = height // 4
     # Use similar width to the old squares for the gradient bar
-    bar_width = int(row_h * 0.8)
+    bar_width = width // 3
     padding = int(row_h * 0.1)
     
     try:
@@ -552,7 +559,7 @@ def run_color_test():
             ("B:", 2, (0, 0, 255))
         ]
 
-        text_x = padding + bar_width + padding # Right of the bar
+        text_x = padding + bar_width + 3 # Right of the bar
 
         for i, (text, val_idx, color) in enumerate(items):
             y_start = i * row_h
@@ -630,10 +637,10 @@ def run_color_test():
             elif key == '0': # Reset
                 matrix.color_correction = [1.0, 1.0, 1.0]
                 changed = True
-            elif key == 'v': # Brightness Down
+            elif key == '-' or key == '_': # Brightness Down
                 matrix.target_brightness = max(0, matrix.target_brightness - 5)
                 changed = True
-            elif key == 'V': # Brightness Up
+            elif key == '+' or key == '=': # Brightness Up
                 matrix.target_brightness = min(100, matrix.target_brightness + 5)
                 changed = True
             
@@ -661,6 +668,7 @@ def run_color_test():
         print(f"To use these settings, add these flags to your command:")
         print(f"  --led-color-correction={cc[0]:.1f}:{cc[1]:.1f}:{cc[2]:.1f}")
         print(f"  --led-brightness={matrix.target_brightness}")
+        print(f"  --led-color-control=launcher")
         print("")
 
     finally:
