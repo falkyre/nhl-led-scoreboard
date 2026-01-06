@@ -12,12 +12,13 @@ This solution uses **[Adafruit's Blinka Raspberry Pi 5 Piomatter](https://github
 2.  **Raw Adapter**: The emulator is configured to use its `raw` display adapter, which exposes the pixel data as a NumPy array.
 3.  **Pi5 Launcher**: This script intercepts the emulator's initialization, reads the raw frame data, performs gamma correction, and sends it to the `piomatter` library to be displayed on the physical matrix.
 
+
 ## Prerequisites
 
 ### Hardware
 
 *   **Raspberry Pi 5**
-*   **RGB LED Matrix** (Adafruit Panels are recommended. 128x64 size works best with the nhl-led-scoreboard)
+*   **RGB LED Matrix** (Adafruit Panels are recommended. **`128x64`** size works best with the `pi5_launcher.py` and nhl-led-scoreboard)
 *   **RPi5 Power Supply** (Must supply direct to rpi5 and not power from Bonnet or HAT)
 *   **RGB LED Matrix Power Supply** (Must supply direct to matrix)
 
@@ -33,12 +34,14 @@ Ensure you have the following installed (these are included in `requirements-pi5
 *   **Adafruit-Blinka**: CircuitPython hardware compatibility layer.
 *   **OS Packages**: Packages that the nhl-led-scoreboard depends on. These are included in `apt-requirements` and can be installed using the `scripts/sbtools/aptfile` script.
 
-> [!TIP]
-> You can use the `"scripts/sbtools/sb-init"` script to install the required dependencies.  It will create the virtual environment and install the required packages as well as the udev rules for the pi5.
 
 > [!CAUTION]
 > Do **NOT** install the `rpi-rgb-led-matrix` library. It is not compatible with the Raspberry Pi 5.  Do not run the `scripts/install.sh` script.  It will install the `rpi-rgb-led-matrix` library.  An new install.sh will be created for the Pi5 at a future time.
 
+> [!TIP]
+> You can use the `"scripts/sbtools/sb-init"` script to skip the steps below and install the required dependencies.  It will create the virtual environment and install the required packages as well as the udev rules for the pi5.
+
+## Manual Installation
 To install the required dependencies, run in your virtual environment:
 
 ```bash
@@ -70,6 +73,9 @@ The launcher relies on a specific configuration file for the emulator to ensure 
 
 > [!IMPORTANT]
 > You **MUST** rename `pi5_emulator_config.json` to `emulator_config.json` for the emulator to load it.
+
+> [!CAUTION]
+> Do **NOT** use the `pi5` adapter in the emulator configuration with the `pi5_launcher.py` script.  It will have double processing of the pixel data and cause the display to be garbled.  *ALWAYS* use the `raw` adapter instead.  
 
 **File:** `emulator_config.json`
 
