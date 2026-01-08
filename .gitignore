@@ -190,3 +190,5 @@ config.html
 emulator_config.json_launcher
 emulator_config-pi5.json
 emulator_config.json
+config/layout/logos_128x32.json
+config/layout/logos_128x64.json
