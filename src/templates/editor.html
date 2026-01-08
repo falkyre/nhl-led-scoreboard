@@ -86,6 +86,14 @@
             border-color: #00ff00;
         }
 
+        /* Updated resize cursor style */
+        .logo-editable.resizing {
+            cursor: ns-resize !important;
+            /* Vertical arrows imply scaling */
+            border-color: #00ccff;
+            border-style: solid;
+        }
+
         .logo-static {
             cursor: default;
             border: 1px dotted rgba(255, 255, 255, 0.1);
@@ -356,6 +364,8 @@
 
         <h3>Adjustments <span id="adjustmentsFile"
                 style="font-size:0.7em; font-weight:bold; color:#fff; margin-left:5px;"></span></h3>
+        <p style="font-size:0.8em; color:#888; margin-top:-10px;"><b>Scroll</b> over logo to Zoom, or <b>Shift+Drag</b>
+        </p>
 
         <div class="row">
             <div>
@@ -379,7 +389,7 @@
         </div>
         <div class="row" style="margin-top:10px;">
             <button class="secondary" onclick="toggleFlip()">Flip Horizontal</button>
-            <button class="secondary" onclick="resetDefaults()">Reset to 0</button>
+            <button class="secondary" onclick="resetDefaults()">Reset</button>
         </div>
         <div style="margin-top: auto;">
             <button onclick="saveConfig()" style="width:100%">SAVE CHANGES</button>
@@ -437,7 +447,6 @@
         let opponentConfig = null;
         let emulatorRunning = false;
 
-        // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             fetch('/api/files')
                 .then(r => r.json())
@@ -566,22 +575,22 @@
             matrixW = w;
             matrixH = h;
 
-            // Editor Grid (Fixed Scale)
+            const pixelW = matrixW * EDITOR_SCALE;
+            const pixelH = matrixH * EDITOR_SCALE;
+
             const canvas = document.getElementById('canvasContainer');
-            canvas.style.width = (matrixW * EDITOR_SCALE) + 'px';
-            canvas.style.height = (matrixH * EDITOR_SCALE) + 'px';
+            canvas.style.width = pixelW + 'px';
+            canvas.style.height = pixelH + 'px';
             canvas.style.backgroundSize = `${EDITOR_SCALE}px ${EDITOR_SCALE}px`;
 
-            // Emulator Inner (Config Scale)
             const inner = document.getElementById('emuInner');
             const emuW = matrixW * EMU_SCALE;
             const emuH = matrixH * EMU_SCALE;
             inner.style.width = emuW + 'px';
             inner.style.height = emuH + 'px';
 
-            // Wrapper Sizing + Padding
             const emuWrap = document.getElementById('emuWrapper');
-            emuWrap.style.width = (emuW + 20) + 'px'; // +20 padding offset for display:block calculations
+            emuWrap.style.width = (emuW + 20) + 'px';
 
             document.getElementById('resDisplay').innerText = `(${matrixW}x${matrixH})`;
 
@@ -743,6 +752,7 @@
 
             const finalX = screenAnchorX + (offsetX * EDITOR_SCALE);
             const finalY = screenAnchorY + (offsetY * EDITOR_SCALE);
+
             const baseSize = matrixH * EDITOR_SCALE;
 
             applyTransform(img1, finalX, finalY, baseSize, zoom, rot, flip);
@@ -776,18 +786,27 @@
         }
 
         function resetDefaults() {
-            document.getElementById('posX').value = 0;
-            document.getElementById('posY').value = 0;
-            document.getElementById('rotate').value = 0;
-            document.getElementById('zoom').value = 100;
-            document.getElementById('logoImg').dataset.flip = 0;
+            const team = document.getElementById('teamSelect').value;
+            const stance = document.getElementById('stanceSelect').value;
+            let conf = getTeamConfig(team, stance);
+            if (!conf) conf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
+
+            let z = conf.zoom || "100%";
+            if (typeof z === 'string') z = parseInt(z.replace('%', ''));
+
+            document.getElementById('posX').value = conf.position ? conf.position[0] : 0;
+            document.getElementById('posY').value = conf.position ? conf.position[1] : 0;
+            document.getElementById('zoom').value = z;
+            document.getElementById('rotate').value = conf.rotate || 0;
+            const img = document.getElementById('logoImg');
+            img.dataset.flip = conf.flip || 0;
             renderVisuals();
         }
 
         function saveConfig() {
             const team = document.getElementById('teamSelect').value;
             const stance = document.getElementById('stanceSelect').value;
-            const filename = currentFileName; // USE GLOBAL VAR
+            const filename = currentFileName;
             const status = document.getElementById('statusMsg');
 
             if (!filename) {
@@ -833,17 +852,60 @@
         function setupDrag() {
             const img = document.getElementById('logoImg');
             let isDragging = false;
+            let isResizing = false;
             let startX, startY;
+            let startZoom = 100;
+
+            window.addEventListener('keydown', e => {
+                if (e.key === 'Shift') img.classList.add('resizing');
+            });
+            window.addEventListener('keyup', e => {
+                if (e.key === 'Shift') img.classList.remove('resizing');
+            });
+
+            // Wheel Zoom
+            img.addEventListener('wheel', e => {
+                e.preventDefault();
+                let z = parseInt(document.getElementById('zoom').value) || 100;
+                const delta = Math.sign(e.deltaY) * -5; // 5% increment
+                let newZoom = z + delta;
+                if (newZoom < 10) newZoom = 10;
+                if (newZoom > 500) newZoom = 500;
+                document.getElementById('zoom').value = newZoom;
+                renderVisuals();
+            });
 
             img.addEventListener('mousedown', e => {
-                isDragging = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                img.style.cursor = 'grabbing';
-                e.preventDefault();
+                if (e.shiftKey) {
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startZoom = parseInt(document.getElementById('zoom').value) || 100;
+                    img.classList.add('resizing');
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    img.style.cursor = 'grabbing';
+                    e.preventDefault();
+                }
             });
 
             window.addEventListener('mousemove', e => {
+                if (isResizing) {
+                    const dy = e.clientY - startY;
+                    const dx = e.clientX - startX;
+                    const delta = (Math.abs(dx) > Math.abs(dy)) ? dx : dy;
+                    let newZoom = startZoom + delta;
+                    if (newZoom < 10) newZoom = 10;
+                    if (newZoom > 500) newZoom = 500;
+                    document.getElementById('zoom').value = newZoom;
+                    renderVisuals();
+                    return;
+                }
+
                 if (!isDragging) return;
                 const dx = e.clientX - startX;
                 const dy = e.clientY - startY;
@@ -862,6 +924,11 @@
             });
 
             window.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    // If shift released during drag, remove class
+                    if (!window.event || !window.event.shiftKey) img.classList.remove('resizing');
+                }
                 if (isDragging) {
                     isDragging = false;
                     img.style.cursor = 'move';
