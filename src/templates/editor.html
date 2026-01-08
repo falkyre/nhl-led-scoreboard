@@ -86,10 +86,8 @@
             border-color: #00ff00;
         }
 
-        /* Updated resize cursor style */
         .logo-editable.resizing {
             cursor: ns-resize !important;
-            /* Vertical arrows imply scaling */
             border-color: #00ccff;
             border-style: solid;
         }
@@ -217,6 +215,18 @@
             justify-content: space-between;
             align-items: center;
             flex: 0 0 auto;
+        }
+
+        /* New container for header buttons */
+        .emu-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .emu-controls button {
+            padding: 5px 15px;
+            font-size: 0.9em;
         }
 
         .emulator-wrapper {
@@ -354,14 +364,6 @@
 
         <hr style="border-color:#444; width:100%">
 
-        <div style="margin-bottom: 20px; background: #222; padding: 10px; border-radius: 4px;">
-            <label>Emulator Control</label>
-            <div class="row">
-                <button onclick="launchEmulator()" id="btnLaunch" style="background:#28a745;">Launch</button>
-                <button onclick="stopEmulator()" id="btnStop" class="danger">Stop</button>
-            </div>
-        </div>
-
         <h3>Adjustments <span id="adjustmentsFile"
                 style="font-size:0.7em; font-weight:bold; color:#fff; margin-left:5px;"></span></h3>
         <p style="font-size:0.8em; color:#888; margin-top:-10px;"><b>Scroll</b> over logo to Zoom, or <b>Shift+Drag</b>
@@ -425,8 +427,12 @@
                 Live Emulator
                 <span style="font-size:0.8em; color:#888;">(localhost:{{ emulator_port }})</span>
             </h3>
-            <button class="secondary" onclick="toggleEmulatorCollapse()"
-                style="padding: 5px 10px; font-size: 0.8em;">Collapse/Expand</button>
+
+            <div class="emu-controls">
+                <button onclick="launchEmulator()" style="background:#28a745;">Launch</button>
+                <button onclick="stopEmulator()" class="danger">Stop</button>
+                <button class="secondary" onclick="toggleEmulatorCollapse()">Collapse</button>
+            </div>
         </div>
 
         <div id="emuWrapper" class="emulator-wrapper collapsed">
@@ -867,7 +873,7 @@
             img.addEventListener('wheel', e => {
                 e.preventDefault();
                 let z = parseInt(document.getElementById('zoom').value) || 100;
-                const delta = Math.sign(e.deltaY) * -5; // 5% increment
+                const delta = Math.sign(e.deltaY) * -5;
                 let newZoom = z + delta;
                 if (newZoom < 10) newZoom = 10;
                 if (newZoom > 500) newZoom = 500;
