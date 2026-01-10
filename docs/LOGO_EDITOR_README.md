@@ -1,6 +1,3 @@
-Here is a comprehensive User's Guide formatted in GitHub Markdown. You can save this as `EDITOR_README.md` or append it to your project's documentation.
-
----
 
 # NHL LED Scoreboard Logo Editor
 
