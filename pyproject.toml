@@ -27,6 +27,7 @@ dependencies = [
     "richcolorlog==1.44.12",
     "tzlocal>=5.2",
     "watchdog>=6.0.0",
+    "flask>=3.0.0",
     "rgbmatrixemulator>=0.13.5 ; platform_system != 'Linux'",
 
     # Pi/Linux-only packages:

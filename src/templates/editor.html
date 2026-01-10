@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NHL Scoreboard Logo Editor</title>
+    <style>
+        @font-face {
+            font-family: 'PixelFont';
+            src: url('/assets/fonts/04B_24__.TTF') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'ScoreFont';
+            src: url('/assets/fonts/score_large.otf') format('opentype');
+        }
+
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent: #007acc;
+            --grid-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .controls {
+            flex: 0 0 350px;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        .editor-container {
+            position: relative;
+            background-color: #000;
+            border: 2px solid #555;
+            background-image: linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 10px 10px;
+            overflow: hidden;
+            flex: 0 0 auto;
+            transition: width 0.3s, height 0.3s;
+        }
+
+        .logo-obj {
+            position: absolute;
+            transform-origin: center center;
+            left: 0;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo-editable {
+            cursor: move;
+            border: 1px dashed rgba(255, 255, 255, 0.5);
+            user-select: none;
+        }
+
+        .logo-editable:hover {
+            border-color: #00ff00;
+        }
+
+        .logo-editable.resizing {
+            cursor: ns-resize !important;
+            border-color: #00ccff;
+            border-style: solid;
+        }
+
+        .logo-static {
+            cursor: default;
+            border: 1px dotted rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .gradient-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .game-info-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 1px 1px 0px #000;
+        }
+
+        .info-line {
+            color: #ffffff;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .anchor-marker {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 0, 0, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        /* Controls CSS */
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        select,
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            background: #444;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            box-sizing: border-box;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            transform: scale(1.2);
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row>div {
+            flex: 1;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        button.secondary {
+            background: #555;
+        }
+
+        button.danger {
+            background: #cc3300;
+        }
+
+        /* Emulator Specific */
+        .emulator-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex: 0 0 auto;
+        }
+
+        /* New container for header buttons */
+        .emu-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .emu-controls button {
+            padding: 5px 15px;
+            font-size: 0.9em;
+        }
+
+        .emulator-wrapper {
+            background: #222;
+            border-radius: 8px;
+            border: 1px solid #444;
+            overflow: auto;
+            max-height: 50vh;
+            padding: 10px;
+            transition: max-height 0.3s, padding 0.3s, opacity 0.3s;
+            opacity: 1;
+            display: block;
+            width: calc(100% - 20px);
+            box-sizing: content-box;
+        }
+
+        .emulator-wrapper.collapsed {
+            max-height: 0;
+            padding: 0;
+            border: none;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        #emuInner {
+            position: relative;
+            background: #000;
+            margin: 0 auto;
+            flex: 0 0 auto;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        .emu-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            z-index: 100;
+            display: none;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #555;
+            margin-right: 5px;
+        }
+
+        .status-dot.running {
+            background: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        h2,
+        h3 {
+            margin-top: 0;
+        }
+
+        .status {
+            font-size: 0.8em;
+            color: #888;
+            text-align: right;
+            min-height: 1.2em;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="controls">
+        <h2>Configuration</h2>
+
+        <div>
+            <label>Matrix Size</label>
+            <select id="sizeSelect" onchange="loadMatrixSize(true)">
+                <option value="64x32">64x32</option>
+                <option value="128x64">128x64</option>
+                <option value="128x32">128x32</option>
+            </select>
+        </div>
+
+        <div>
+            <label>Config File</label>
+            <select id="fileSelect" onchange="loadConfig()">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+
+        <hr style="border-color:#444; width:100%">
+        <div>
+            <label style="color:var(--accent)">Main Team (Editing)</label>
+            <select id="teamSelect" onchange="updateUI()">
+                {% for team in teams %}
+                <option value="{{ team }}">{{ team }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="row">
+            <div>
+                <label>Main Stance</label>
+                <select id="stanceSelect" onchange="updateUI()">
+                    <option value="home">Home (Left)</option>
+                    <option value="away">Away (Right)</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-top:15px;">
+            <label style="color:#aaa">Opponent (Visual Only)</label>
+            <select id="team2Select" onchange="updateUI()">
+                <option value="">(None)</option>
+                {% for team in teams %}
+                <option value="{{ team }}">{{ team }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="checkbox-row" style="margin-top: 15px;">
+            <input type="checkbox" id="showGradient" checked onchange="toggleGradient()">
+            <label for="showGradient" style="margin:0; font-weight:normal;">Show Gradient Layer</label>
+        </div>
+
+        <hr style="border-color:#444; width:100%">
+
+        <h3>Adjustments <span id="adjustmentsFile"
+                style="font-size:0.7em; font-weight:bold; color:#fff; margin-left:5px;"></span></h3>
+        <p style="font-size:0.8em; color:#888; margin-top:-10px;"><b>Scroll</b> over logo to Zoom, or <b>Shift+Drag</b>
+        </p>
+
+        <div class="row">
+            <div>
+                <label>Offset X</label>
+                <input type="number" id="posX" value="0" oninput="updateLogoFromInput()">
+            </div>
+            <div>
+                <label>Offset Y</label>
+                <input type="number" id="posY" value="0" oninput="updateLogoFromInput()">
+            </div>
+        </div>
+        <div class="row">
+            <div>
+                <label>Zoom (%)</label>
+                <input type="number" id="zoom" value="100" oninput="updateLogoFromInput()">
+            </div>
+            <div>
+                <label>Rotate (deg)</label>
+                <input type="number" id="rotate" value="0" oninput="updateLogoFromInput()">
+            </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+            <button class="secondary" onclick="toggleFlip()">Flip Horizontal</button>
+            <button class="secondary" onclick="resetDefaults()">Reset</button>
+        </div>
+        <div style="margin-top: auto;">
+            <button onclick="saveConfig()" style="width:100%">SAVE CHANGES</button>
+            <div id="statusMsg" class="status"></div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+            <h3>Visual Editor <span id="resDisplay" style="font-weight:normal; font-size:0.8em; color:#888;"></span>
+            </h3>
+        </div>
+
+        <div id="canvasContainer" class="editor-container">
+            <div
+                style="position:absolute; left:50%; top:0; bottom:0; border-left:1px dashed #444; pointer-events:none;">
+            </div>
+            <div id="gameInfoOverlay" class="game-info-overlay">
+                <div class="info-line" style="font-family: 'PixelFont'; margin-top: 0;">3rd</div>
+                <div class="info-line" style="font-family: 'PixelFont';">12:34</div>
+                <div class="info-line" style="font-family: 'ScoreFont'; margin-top: 0;">3-2</div>
+            </div>
+            <img id="gradientImg" class="gradient-layer" src="" alt="Gradient" draggable="false">
+            <div id="anchorMarker" class="anchor-marker"></div>
+            <img id="logoImg" class="logo-obj logo-editable" src="" alt="Main Logo" draggable="false">
+            <img id="logoImg2" class="logo-obj logo-static" src="" alt="Opponent Logo" draggable="false"
+                style="display:none;">
+        </div>
+
+        <div class="emulator-header">
+            <h3>
+                <span id="emuStatusDot" class="status-dot"></span>
+                Live Emulator
+                <span style="font-size:0.8em; color:#888;">(localhost:{{ emulator_port }})</span>
+            </h3>
+
+            <div class="emu-controls">
+                <button onclick="launchEmulator()" style="background:#28a745;">Launch</button>
+                <button onclick="stopEmulator()" class="danger">Stop</button>
+                <button class="secondary" onclick="toggleEmulatorCollapse()">Collapse</button>
+            </div>
+        </div>
+
+        <div id="emuWrapper" class="emulator-wrapper collapsed">
+            <div id="emuInner">
+                <div id="emuLoader" class="emu-loader">Loading...</div>
+                <iframe id="emuFrame" src="about:blank" title="Scoreboard Emulator"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = {};
+        let currentFileName = "";
+        let matrixW = 64;
+        let matrixH = 32;
+        const EDITOR_SCALE = 10;
+        const EMU_SCALE = {{ emulator_pixel_size }};
+        let opponentConfig = null;
+        let emulatorRunning = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/files')
+                .then(r => r.json())
+                .then(files => {
+                    const sel = document.getElementById('fileSelect');
+                    sel.innerHTML = '';
+                    files.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f;
+                        opt.textContent = f;
+                        sel.appendChild(opt);
+                    });
+                    checkEmulatorStatus(true);
+                });
+
+            setupDrag();
+        });
+
+        // --- Emulator Logic ---
+
+        function checkEmulatorStatus(isInit = false) {
+            fetch('/api/emulator/status')
+                .then(r => r.json())
+                .then(data => {
+                    emulatorRunning = data.running;
+                    const dot = document.getElementById('emuStatusDot');
+                    if (emulatorRunning) {
+                        dot.classList.add('running');
+                        if (isInit) {
+                            const activeW = data.w;
+                            const activeH = data.h;
+                            const sizeStr = `${activeW}x${activeH}`;
+
+                            const sel = document.getElementById('sizeSelect');
+                            let found = false;
+                            for (let i = 0; i < sel.options.length; i++) {
+                                if (sel.options[i].value === sizeStr) {
+                                    sel.selectedIndex = i;
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            matrixW = activeW;
+                            matrixH = activeH;
+
+                            loadMatrixSize(false);
+
+                            const el = document.getElementById('emuWrapper');
+                            el.classList.remove('collapsed');
+                            const iframe = document.getElementById('emuFrame');
+                            if (iframe.src === 'about:blank' || iframe.src === '') {
+                                iframe.src = `http://localhost:{{ emulator_port }}`;
+                            }
+                        }
+                    } else {
+                        dot.classList.remove('running');
+                        if (isInit) {
+                            const sel = document.getElementById('fileSelect');
+                            for (let i = 0; i < sel.options.length; i++) {
+                                if (sel.options[i].value.includes('64x32')) sel.selectedIndex = i;
+                            }
+                            loadMatrixSize(false);
+                        }
+                    }
+                });
+        }
+
+        function launchEmulator() {
+            const status = document.getElementById('statusMsg');
+            status.innerText = "Launching Emulator...";
+
+            const loader = document.getElementById('emuLoader');
+            const iframe = document.getElementById('emuFrame');
+            const wrapper = document.getElementById('emuWrapper');
+
+            wrapper.classList.remove('collapsed');
+            loader.style.display = 'flex';
+            iframe.src = 'about:blank';
+
+            fetch('/api/emulator/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ w: matrixW, h: matrixH })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        status.innerText = "Emulator Started!";
+                        status.style.color = "lightgreen";
+
+                        setTimeout(() => {
+                            iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
+                            iframe.onload = () => { loader.style.display = 'none'; };
+                            setTimeout(() => { loader.style.display = 'none'; }, 2000);
+                        }, 2000);
+
+                        checkEmulatorStatus();
+                    } else {
+                        status.innerText = "Error: " + res.message;
+                        status.style.color = "red";
+                        loader.style.display = 'none';
+                    }
+                });
+        }
+
+        function stopEmulator() {
+            fetch('/api/emulator/stop', { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    document.getElementById('statusMsg').innerText = "Emulator Stopped.";
+                    document.getElementById('emuFrame').src = "about:blank";
+                    checkEmulatorStatus();
+                });
+        }
+
+        function toggleEmulatorCollapse() {
+            const el = document.getElementById('emuWrapper');
+            el.classList.toggle('collapsed');
+        }
+
+        function loadMatrixSize(userTriggered = false) {
+            const sizeStr = document.getElementById('sizeSelect').value;
+            const [w, h] = sizeStr.split('x').map(Number);
+
+            matrixW = w;
+            matrixH = h;
+
+            const pixelW = matrixW * EDITOR_SCALE;
+            const pixelH = matrixH * EDITOR_SCALE;
+
+            const canvas = document.getElementById('canvasContainer');
+            canvas.style.width = pixelW + 'px';
+            canvas.style.height = pixelH + 'px';
+            canvas.style.backgroundSize = `${EDITOR_SCALE}px ${EDITOR_SCALE}px`;
+
+            const inner = document.getElementById('emuInner');
+            const emuW = matrixW * EMU_SCALE;
+            const emuH = matrixH * EMU_SCALE;
+            inner.style.width = emuW + 'px';
+            inner.style.height = emuH + 'px';
+
+            const emuWrap = document.getElementById('emuWrapper');
+            emuWrap.style.width = (emuW + 20) + 'px';
+
+            document.getElementById('resDisplay').innerText = `(${matrixW}x${matrixH})`;
+
+            updateOverlayTextSizes();
+
+            const gradImg = document.getElementById('gradientImg');
+            const showGrad = document.getElementById('showGradient').checked;
+            if (sizeStr === '64x32' || sizeStr === '128x64') {
+                gradImg.src = `/assets/images/${sizeStr}_scoreboard_center_gradient.png`;
+                gradImg.style.display = showGrad ? 'block' : 'none';
+            } else {
+                gradImg.style.display = 'none';
+            }
+
+            const expectedFile = `logos_${sizeStr}.json`;
+            const sel = document.getElementById('fileSelect');
+            let optionFound = false;
+
+            for (let i = 0; i < sel.options.length; i++) {
+                if (sel.options[i].value === expectedFile) {
+                    sel.selectedIndex = i;
+                    optionFound = true;
+                    break;
+                }
+            }
+
+            if (!optionFound) {
+                const opt = document.createElement('option');
+                opt.value = expectedFile;
+                opt.textContent = expectedFile;
+                sel.appendChild(opt);
+                sel.value = expectedFile;
+            } else {
+                sel.value = expectedFile;
+            }
+
+            loadConfig(expectedFile);
+
+            if (userTriggered && emulatorRunning) {
+                if (confirm(`Matrix size changed to ${sizeStr}. Restart the emulator with this resolution?`)) {
+                    launchEmulator();
+                }
+            }
+        }
+
+        function toggleGradient() {
+            const gradImg = document.getElementById('gradientImg');
+            const showGrad = document.getElementById('showGradient').checked;
+            const sizeStr = document.getElementById('sizeSelect').value;
+            if (sizeStr === '64x32' || sizeStr === '128x64') {
+                gradImg.style.display = showGrad ? 'block' : 'none';
+            }
+        }
+
+        function updateOverlayTextSizes() {
+            const sizeStr = document.getElementById('sizeSelect').value;
+            let topLinesSize = 8;
+            let scoreLineSize = 16;
+            if (sizeStr === '128x64') {
+                topLinesSize = 16;
+                scoreLineSize = 32;
+            }
+            const cssTopSize = topLinesSize * EDITOR_SCALE;
+            const cssScoreSize = scoreLineSize * EDITOR_SCALE;
+            const lines = document.querySelectorAll('#gameInfoOverlay .info-line');
+            lines[0].style.fontSize = cssTopSize + 'px';
+            lines[0].style.height = cssTopSize + 'px';
+            lines[1].style.fontSize = cssTopSize + 'px';
+            lines[1].style.height = cssTopSize + 'px';
+            lines[2].style.fontSize = cssScoreSize + 'px';
+            lines[2].style.height = cssScoreSize + 'px';
+        }
+
+        function loadConfig(specificFilename = null) {
+            const filename = specificFilename || document.getElementById('fileSelect').value;
+            if (!filename) return;
+            currentFileName = filename;
+
+            document.getElementById('adjustmentsFile').innerText = `(${filename})`;
+
+            fetch('/api/config/' + filename + '?t=' + new Date().getTime())
+                .then(r => r.json())
+                .then(data => {
+                    currentConfig = data;
+                    updateUI();
+                })
+                .catch(err => console.error("Config load failed", err));
+        }
+
+        function getTeamConfig(team, stance) {
+            if (!currentConfig.scoreboard || !currentConfig.scoreboard.logos) return {};
+            const logos = currentConfig.scoreboard.logos;
+            if (logos[team]) {
+                if (logos[team][stance]) return logos[team][stance];
+                if (logos[team].position) return logos[team];
+            }
+            return null;
+        }
+
+        function updateUI() {
+            const team1 = document.getElementById('teamSelect').value;
+            const stance1 = document.getElementById('stanceSelect').value;
+            const team2 = document.getElementById('team2Select').value;
+            const sizeStr = document.getElementById('sizeSelect').value;
+
+            const img1 = document.getElementById('logoImg');
+            img1.src = `/assets/logos/${team1}/light/${sizeStr}.png`;
+
+            let conf1 = getTeamConfig(team1, stance1);
+            if (!conf1) conf1 = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
+            let z = conf1.zoom || "100%";
+            if (typeof z === 'string') z = parseInt(z.replace('%', ''));
+
+            document.getElementById('posX').value = conf1.position ? conf1.position[0] : 0;
+            document.getElementById('posY').value = conf1.position ? conf1.position[1] : 0;
+            document.getElementById('zoom').value = z;
+            document.getElementById('rotate').value = conf1.rotate || 0;
+            img1.dataset.flip = conf1.flip || 0;
+
+            const img2 = document.getElementById('logoImg2');
+            if (team2) {
+                img2.style.display = 'block';
+                img2.src = `/assets/logos/${team2}/light/${sizeStr}.png`;
+                const stance2 = (stance1 === 'home') ? 'away' : 'home';
+                let conf2 = getTeamConfig(team2, stance2);
+                if (!conf2) conf2 = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
+                opponentConfig = conf2;
+                opponentConfig.stance = stance2;
+            } else {
+                img2.style.display = 'none';
+                opponentConfig = null;
+            }
+            renderVisuals();
+        }
+
+        function getAnchorPoint(stance) {
+            const midY = matrixH / 2;
+            if (stance === 'home') return { x: matrixW * 0.25, y: midY };
+            else return { x: matrixW * 0.75, y: midY };
+        }
+
+        function renderVisuals() {
+            const stance1 = document.getElementById('stanceSelect').value;
+            const img1 = document.getElementById('logoImg');
+            const marker = document.getElementById('anchorMarker');
+
+            const offsetX = parseInt(document.getElementById('posX').value);
+            const offsetY = parseInt(document.getElementById('posY').value);
+            const zoom = parseInt(document.getElementById('zoom').value) / 100;
+            const rot = parseInt(document.getElementById('rotate').value);
+            const flip = parseInt(img1.dataset.flip);
+
+            const anchor1 = getAnchorPoint(stance1);
+            const screenAnchorX = anchor1.x * EDITOR_SCALE;
+            const screenAnchorY = anchor1.y * EDITOR_SCALE;
+
+            marker.style.left = screenAnchorX + 'px';
+            marker.style.top = screenAnchorY + 'px';
+
+            const finalX = screenAnchorX + (offsetX * EDITOR_SCALE);
+            const finalY = screenAnchorY + (offsetY * EDITOR_SCALE);
+
+            const baseSize = matrixH * EDITOR_SCALE;
+
+            applyTransform(img1, finalX, finalY, baseSize, zoom, rot, flip);
+
+            if (opponentConfig) {
+                const img2 = document.getElementById('logoImg2');
+                const anchor2 = getAnchorPoint(opponentConfig.stance);
+                let z2 = opponentConfig.zoom || "100%";
+                if (typeof z2 === 'string') z2 = parseInt(z2.replace('%', ''));
+                z2 = z2 / 100;
+                const pos2 = opponentConfig.position || [0, 0];
+                const finalX2 = (anchor2.x * EDITOR_SCALE) + (pos2[0] * EDITOR_SCALE);
+                const finalY2 = (anchor2.y * EDITOR_SCALE) + (pos2[1] * EDITOR_SCALE);
+                applyTransform(img2, finalX2, finalY2, baseSize, z2, opponentConfig.rotate || 0, opponentConfig.flip || 0);
+            }
+        }
+
+        function applyTransform(img, x, y, size, zoom, rot, flip) {
+            img.style.width = size + 'px';
+            img.style.height = 'auto';
+            img.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${zoom}) rotate(${rot}deg) ${flip ? 'scaleX(-1)' : ''}`;
+        }
+
+        function updateLogoFromInput() { renderVisuals(); }
+        function toggleFlip() {
+            const img = document.getElementById('logoImg');
+            let f = parseInt(img.dataset.flip);
+            f = f === 1 ? 0 : 1;
+            img.dataset.flip = f;
+            renderVisuals();
+        }
+
+        function resetDefaults() {
+            const team = document.getElementById('teamSelect').value;
+            const stance = document.getElementById('stanceSelect').value;
+            let conf = getTeamConfig(team, stance);
+            if (!conf) conf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
+
+            let z = conf.zoom || "100%";
+            if (typeof z === 'string') z = parseInt(z.replace('%', ''));
+
+            document.getElementById('posX').value = conf.position ? conf.position[0] : 0;
+            document.getElementById('posY').value = conf.position ? conf.position[1] : 0;
+            document.getElementById('zoom').value = z;
+            document.getElementById('rotate').value = conf.rotate || 0;
+            const img = document.getElementById('logoImg');
+            img.dataset.flip = conf.flip || 0;
+            renderVisuals();
+        }
+
+        function saveConfig() {
+            const team = document.getElementById('teamSelect').value;
+            const stance = document.getElementById('stanceSelect').value;
+            const filename = currentFileName;
+            const status = document.getElementById('statusMsg');
+
+            if (!filename) {
+                status.innerText = "No file selected.";
+                return;
+            }
+
+            const newObj = {
+                zoom: document.getElementById('zoom').value + "%",
+                position: [
+                    parseInt(document.getElementById('posX').value),
+                    parseInt(document.getElementById('posY').value)
+                ],
+                rotate: parseInt(document.getElementById('rotate').value),
+                flip: parseInt(document.getElementById('logoImg').dataset.flip),
+                crop: [0, 0, 0, 0]
+            };
+
+            if (!currentConfig.scoreboard) currentConfig.scoreboard = {};
+            if (!currentConfig.scoreboard.logos) currentConfig.scoreboard.logos = {};
+            if (!currentConfig.scoreboard.logos[team]) currentConfig.scoreboard.logos[team] = {};
+
+            currentConfig.scoreboard.logos[team][stance] = newObj;
+
+            fetch('/api/config/' + filename, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentConfig)
+            })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        status.innerText = "Saved!";
+                        status.style.color = "#00ff00";
+                    } else {
+                        status.innerText = "Error: " + (res.message || "Unknown");
+                        status.style.color = "#ff4444";
+                    }
+                    setTimeout(() => status.innerText = "", 3000);
+                });
+        }
+
+        function setupDrag() {
+            const img = document.getElementById('logoImg');
+            let isDragging = false;
+            let isResizing = false;
+            let startX, startY;
+            let startZoom = 100;
+
+            window.addEventListener('keydown', e => {
+                if (e.key === 'Shift') img.classList.add('resizing');
+            });
+            window.addEventListener('keyup', e => {
+                if (e.key === 'Shift') img.classList.remove('resizing');
+            });
+
+            // Wheel Zoom
+            img.addEventListener('wheel', e => {
+                e.preventDefault();
+                let z = parseInt(document.getElementById('zoom').value) || 100;
+                const delta = Math.sign(e.deltaY) * -5;
+                let newZoom = z + delta;
+                if (newZoom < 10) newZoom = 10;
+                if (newZoom > 500) newZoom = 500;
+                document.getElementById('zoom').value = newZoom;
+                renderVisuals();
+            });
+
+            img.addEventListener('mousedown', e => {
+                if (e.shiftKey) {
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startZoom = parseInt(document.getElementById('zoom').value) || 100;
+                    img.classList.add('resizing');
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    img.style.cursor = 'grabbing';
+                    e.preventDefault();
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (isResizing) {
+                    const dy = e.clientY - startY;
+                    const dx = e.clientX - startX;
+                    const delta = (Math.abs(dx) > Math.abs(dy)) ? dx : dy;
+                    let newZoom = startZoom + delta;
+                    if (newZoom < 10) newZoom = 10;
+                    if (newZoom > 500) newZoom = 500;
+                    document.getElementById('zoom').value = newZoom;
+                    renderVisuals();
+                    return;
+                }
+
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const dMatrixX = Math.round(dx / EDITOR_SCALE);
+                const dMatrixY = Math.round(dy / EDITOR_SCALE);
+
+                if (dMatrixX !== 0 || dMatrixY !== 0) {
+                    const xInput = document.getElementById('posX');
+                    const yInput = document.getElementById('posY');
+                    xInput.value = parseInt(xInput.value) + dMatrixX;
+                    yInput.value = parseInt(yInput.value) + dMatrixY;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    renderVisuals();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    // If shift released during drag, remove class
+                    if (!window.event || !window.event.shiftKey) img.classList.remove('resizing');
+                }
+                if (isDragging) {
+                    isDragging = false;
+                    img.style.cursor = 'move';
+                }
+            });
+        }
+
+    </script>
+</body>
+
+</html>
