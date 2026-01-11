@@ -6,7 +6,7 @@
     {
       "id": "stats_leaders",
       "class_name": "StatsLeadersBoard",
-      "module": "board"
+      "module": "stats_leaders"
     }
   ]
 }
