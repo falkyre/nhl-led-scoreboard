@@ -523,3 +523,173 @@ class Standings:
             if standing.team.abbrev == abbrev:
                 return standing
         return None
+
+    @property
+    def by_conference(self):
+        """
+        Get standings organized by conference (legacy API compatibility).
+
+        Returns an object with 'eastern' and 'western' attributes containing
+        lists of team standings dictionaries compatible with the old API format.
+        """
+        class ConferenceStandings:
+            def __init__(self, eastern_teams, western_teams):
+                self.eastern = self._convert_to_dicts(eastern_teams)
+                self.western = self._convert_to_dicts(western_teams)
+
+            def _convert_to_dicts(self, teams: List[TeamStanding]) -> List[Dict]:
+                """Convert TeamStanding objects to dict format for legacy compatibility"""
+                return [
+                    {
+                        'teamAbbrev': {'default': team.team.abbrev},
+                        'teamName': {'default': team.team.name},
+                        'points': team.points,
+                        'wins': team.record.wins,
+                        'losses': team.record.losses,
+                        'otLosses': team.record.ot_losses,
+                        'gamesPlayed': team.games_played,
+                        'conferenceSequence': team.conference_sequence,
+                        'divisionSequence': team.division_sequence,
+                        'wildcardSequence': team.wildcard_sequence,
+                    }
+                    for team in teams
+                ]
+
+        return ConferenceStandings(self.eastern.teams, self.western.teams)
+
+    @property
+    def by_division(self):
+        """
+        Get standings organized by division (legacy API compatibility).
+
+        Returns an object with 'metropolitan', 'atlantic', 'central', and 'pacific'
+        attributes containing lists of team standings dictionaries.
+        """
+        class DivisionStandings:
+            def __init__(self, all_teams):
+                self.metropolitan = []
+                self.atlantic = []
+                self.central = []
+                self.pacific = []
+
+                for team in all_teams:
+                    team_dict = {
+                        'teamAbbrev': {'default': team.team.abbrev},
+                        'teamName': {'default': team.team.name},
+                        'points': team.points,
+                        'wins': team.record.wins,
+                        'losses': team.record.losses,
+                        'otLosses': team.record.ot_losses,
+                        'gamesPlayed': team.games_played,
+                        'conferenceSequence': team.conference_sequence,
+                        'divisionSequence': team.division_sequence,
+                        'wildcardSequence': team.wildcard_sequence,
+                    }
+
+                    division_name = team.team.division_name.lower()
+                    if division_name == 'metropolitan':
+                        self.metropolitan.append(team_dict)
+                    elif division_name == 'atlantic':
+                        self.atlantic.append(team_dict)
+                    elif division_name == 'central':
+                        self.central.append(team_dict)
+                    elif division_name == 'pacific':
+                        self.pacific.append(team_dict)
+
+                # Sort each division by division_sequence
+                self.metropolitan.sort(key=lambda x: x['divisionSequence'])
+                self.atlantic.sort(key=lambda x: x['divisionSequence'])
+                self.central.sort(key=lambda x: x['divisionSequence'])
+                self.pacific.sort(key=lambda x: x['divisionSequence'])
+
+        return DivisionStandings(self.eastern.teams + self.western.teams)
+
+    @property
+    def by_wildcard(self):
+        """
+        Get standings organized by wildcard format (legacy API compatibility).
+
+        Returns an object with 'eastern' and 'western' attributes, each containing
+        division leaders and wildcard teams.
+        """
+        class WildcardStandings:
+            def __init__(self, conference_teams):
+                self.division_leaders = None
+                self.wild_card = []
+
+                # Separate division leaders (divisionSequence <= 3) from wildcards
+                division_leader_teams = []
+                wildcard_teams = []
+
+                for team in conference_teams:
+                    if team.division_sequence <= 3:
+                        division_leader_teams.append(team)
+                    else:
+                        wildcard_teams.append(team)
+
+                # Sort wildcards by wildcard_sequence
+                wildcard_teams.sort(key=lambda x: x.wildcard_sequence)
+
+                # Convert to dict format
+                self.wild_card = [
+                    {
+                        'teamAbbrev': {'default': team.team.abbrev},
+                        'teamName': {'default': team.team.name},
+                        'points': team.points,
+                        'wins': team.record.wins,
+                        'losses': team.record.losses,
+                        'otLosses': team.record.ot_losses,
+                        'gamesPlayed': team.games_played,
+                        'conferenceSequence': team.conference_sequence,
+                        'divisionSequence': team.division_sequence,
+                        'wildcardSequence': team.wildcard_sequence,
+                    }
+                    for team in wildcard_teams
+                ]
+
+                # Organize division leaders by division
+                class DivisionLeaders:
+                    def __init__(self, teams):
+                        self.metropolitan = []
+                        self.atlantic = []
+                        self.central = []
+                        self.pacific = []
+
+                        for team in teams:
+                            team_dict = {
+                                'teamAbbrev': {'default': team.team.abbrev},
+                                'teamName': {'default': team.team.name},
+                                'points': team.points,
+                                'wins': team.record.wins,
+                                'losses': team.record.losses,
+                                'otLosses': team.record.ot_losses,
+                                'gamesPlayed': team.games_played,
+                                'conferenceSequence': team.conference_sequence,
+                                'divisionSequence': team.division_sequence,
+                                'wildcardSequence': team.wildcard_sequence,
+                            }
+
+                            division_name = team.team.division_name.lower()
+                            if division_name == 'metropolitan':
+                                self.metropolitan.append(team_dict)
+                            elif division_name == 'atlantic':
+                                self.atlantic.append(team_dict)
+                            elif division_name == 'central':
+                                self.central.append(team_dict)
+                            elif division_name == 'pacific':
+                                self.pacific.append(team_dict)
+
+                        # Sort by division_sequence
+                        self.metropolitan.sort(key=lambda x: x['divisionSequence'])
+                        self.atlantic.sort(key=lambda x: x['divisionSequence'])
+                        self.central.sort(key=lambda x: x['divisionSequence'])
+                        self.pacific.sort(key=lambda x: x['divisionSequence'])
+
+                self.division_leaders = DivisionLeaders(division_leader_teams)
+
+        class WildcardConferences:
+            def __init__(self, eastern_teams, western_teams):
+                self.eastern = WildcardStandings(eastern_teams)
+                self.western = WildcardStandings(western_teams)
+
+        return WildcardConferences(self.eastern.teams, self.western.teams)

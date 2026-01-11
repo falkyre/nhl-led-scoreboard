@@ -209,8 +209,8 @@ class Data:
         # Today's date
         self.today = self.date()
 
-        # Get refresh standings
-        self.refresh_standings()
+        # Standings are now managed by StandingsWorker (see src/nhl_api/workers/standings_worker.py)
+        # No need to fetch standings here - the worker handles it in the background
 
         # Playoff Flag
         self.isPlayoff = False
@@ -523,18 +523,9 @@ class Data:
 
     #
     # Standings
-
-    def refresh_standings(self):
-        attempts_remaining = 5
-        while attempts_remaining > 0:
-            try:
-                self.standings = nhl_info.standings()
-                break
-
-            except ValueError as error_message:
-                self.network_issues = True
-                debug.error("Failed to refresh the Standings. {} attempt remaining.".format(attempts_remaining))
-                debug.error(error_message)
+    # NOTE: Standings are now managed by StandingsWorker (src/nhl_api/workers/standings_worker.py)
+    # The worker fetches and caches standings data in the background every 60 minutes.
+    # Boards can access standings via: StandingsWorker.get_cached_data()
     #
     # Teams
 
@@ -688,8 +679,7 @@ class Data:
         self.teams_info = self.get_teams()
         self.teams_info_by_abbrev = self.get_teams_by_code()
 
-        # Update standings
-        self.refresh_standings()
+        # Standings are managed by StandingsWorker - no need to refresh here
 
         # Fetch the playoff data
         self.refresh_playoff()

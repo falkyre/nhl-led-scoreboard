@@ -11,7 +11,7 @@ from api.weather.ecWeather import ecWxWorker
 from api.weather.nwsAlerts import nwsWxAlerts
 from api.weather.owmWeather import owmWxWorker
 from api.weather.wxForecast import wxForecast
-from nhl_api.workers import StatsLeadersWorker
+from nhl_api.workers import StandingsWorker, StatsLeadersWorker
 from sbio.dimmer import Dimmer
 from sbio.screensaver import screenSaver
 from update_checker import UpdateChecker
@@ -85,6 +85,7 @@ class SchedulerManager:
         "Dimmer": "Dimmer",
         "screenSaver_prefix": "screenSaver",
         "statsLeadersWorker": "statsLeadersWorker",
+        "standingsWorker": "standingsWorker",
     }
 
     def __init__(self, data, matrix, sleep_event):
@@ -280,6 +281,20 @@ class SchedulerManager:
             sb_logger.info(f"Scheduled stats leaders worker (id={job_id})")
         else:
             sb_logger.debug(f"Stats leaders worker already scheduled (id={job_id}), skipping add.")
+
+        # standings
+        # Fetches standings data in the background and caches it
+        job_id = self.KNOWN_JOB_IDS["standingsWorker"]
+        if not self._job_exists(job_id, existing_ids):
+            StandingsWorker(
+                self.data,
+                self.data.scheduler,
+                refresh_minutes=60  # Refresh every hour (standings don't change frequently)
+            )
+            existing_ids.append(job_id)
+            sb_logger.info(f"Scheduled standings worker (id={job_id})")
+        else:
+            sb_logger.debug(f"Standings worker already scheduled (id={job_id}), skipping add.")
 
         # update checker
         if self.commandArgs.updatecheck:
