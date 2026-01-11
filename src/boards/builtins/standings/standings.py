@@ -97,7 +97,7 @@ class StandingsBoard(BoardBase):
                 self._render_wildcard_standings(conf_name)
 
     def _render_standing_table(self, name, records, show_indicators=False):
-        """Render a single standings table with scrolling"""
+        """Render a single standings table with scrolling and sticky header"""
         # Calculate the image height
         im_height = (len(records) + 1) * self.font_height
 
@@ -107,6 +107,8 @@ class StandingsBoard(BoardBase):
         # Start at the top
         i = 0
         self.matrix.draw_image((0, i), image)
+        # Draw sticky header on top
+        self._draw_sticky_header(name)
         self.matrix.render()
 
         if show_indicators:
@@ -121,6 +123,8 @@ class StandingsBoard(BoardBase):
         while i > -(im_height - self.matrix.height) and not self.sleepEvent.is_set():
             i -= 1
             self.matrix.draw_image((0, i), image)
+            # Redraw sticky header on top of scrolled content
+            self._draw_sticky_header(name)
             self.matrix.render()
 
             if show_indicators:
@@ -133,6 +137,18 @@ class StandingsBoard(BoardBase):
 
         # Show the bottom before moving to next table
         self.sleepEvent.wait(self.rotation_rate)
+
+    def _draw_sticky_header(self, title: str):
+        """
+        Draw a sticky header that stays at the top during scrolling.
+
+        Args:
+            title: The header text to display
+        """
+        # Draw black rectangle to cover the scrolling content behind the header
+        self.matrix.draw_rectangle((0, 0), (self.matrix.width, self.font_height - 1), fill=(0, 0, 0))
+        # Draw the title text on top
+        self.matrix.draw_text((1, 0), title, font=self.font, fill=(200, 200, 200))
 
     def _render_wildcard_standings(self, conf_name):
         """Render wildcard standings for a conference"""
@@ -159,6 +175,8 @@ class StandingsBoard(BoardBase):
         # Start at the top
         i = 0
         self.matrix.draw_image((0, i), image)
+        # Draw sticky header on top
+        self._draw_sticky_header(conf_name)
         self.matrix.render()
         self.sleepEvent.wait(5)
 
@@ -166,6 +184,8 @@ class StandingsBoard(BoardBase):
         while i > -(img_height - self.matrix.height) and not self.sleepEvent.is_set():
             i -= 1
             self.matrix.draw_image((0, i), image)
+            # Redraw sticky header on top of scrolled content
+            self._draw_sticky_header(conf_name)
             self.matrix.render()
             self.sleepEvent.wait(self.scroll_speed)
 
