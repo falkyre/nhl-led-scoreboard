@@ -81,9 +81,14 @@ class StatsLeadersBoard(BoardBase):
                 # Create and draw the image
                 image = self.draw_leaders(category, leaders_data.leaders, im_height, self.matrix.width)
 
+                # Create header title for sticky header
+                header_title = f"NHL {self.categories[category]} LEADERS"
+
                 # Initial position (start at top)
                 i = 0
                 self.matrix.draw_image((0, i), image)
+                # Draw sticky header on top
+                self._draw_sticky_header(header_title)
                 self.matrix.render()
                 self.sleepEvent.wait(5)  # Show top for 5 seconds
 
@@ -91,6 +96,8 @@ class StatsLeadersBoard(BoardBase):
                 while i > -(im_height - self.matrix.height) and not self.sleepEvent.is_set():
                     i -= 1
                     self.matrix.draw_image((0, i), image)
+                    # Redraw sticky header on top of scrolled content
+                    self._draw_sticky_header(header_title)
                     self.matrix.render()
                     self.sleepEvent.wait(self.scroll_speed)
 
@@ -100,6 +107,18 @@ class StatsLeadersBoard(BoardBase):
         except Exception as e:
             debug.error(f"Error rendering stats leaders: {str(e)}")
             debug.error(f"Stack trace: {traceback.format_exc()}")
+
+    def _draw_sticky_header(self, title: str):
+        """
+        Draw a sticky header that stays at the top during scrolling.
+
+        Args:
+            title: The header text to display
+        """
+        # Draw black rectangle to cover the scrolling content behind the header
+        self.matrix.draw_rectangle((0, 0), (self.matrix.width, self.font_height - 1), fill=(0, 0, 0))
+        # Draw the title text on top
+        self.matrix.draw_text((1 * self.width_multiplier, 0), title, font=self.font, fill=(200, 200, 200))
 
     def format_toi(self, seconds):
         """Convert seconds to MM:SS format for time on ice display."""
