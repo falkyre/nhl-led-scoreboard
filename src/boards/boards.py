@@ -24,7 +24,6 @@ from boards.player_stats import PlayerStatsRenderer
 from boards.scoreticker import Scoreticker
 from boards.screensaver import screenSaver
 from boards.seriesticker import Seriesticker
-from boards.standings import Standings
 from boards.team_summary import TeamSummary
 from boards.wxAlert import wxAlert
 from boards.wxForecast import wxForecast
@@ -72,7 +71,6 @@ class Boards:
         legacy_boards = {
             "scoreticker": Scoreticker,
             "seriesticker": Seriesticker,
-            "standings": Standings,
             "team_summary": TeamSummary,
             "clock": Clock,
             "pbdisplay": pbDisplay,
@@ -730,10 +728,6 @@ class Boards:
         pass
         # StanleyCupChampions(data, matrix, sleepEvent).render()
 
-    def standings(self, data, matrix, sleepEvent):
-        # Try making standings a thread
-        board = self._get_cached_board_instance("standings", Standings, data, matrix, sleepEvent)
-        board.render()
 
     def team_summary(self, data, matrix, sleepEvent):
         board = self._get_cached_board_instance("team_summary", TeamSummary, data, matrix, sleepEvent)
