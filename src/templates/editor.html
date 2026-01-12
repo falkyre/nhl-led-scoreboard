@@ -59,44 +59,46 @@
         .editor-container {
             position: relative;
             background-color: #000;
-            border: 2px solid #555;
-            background-image: linear-gradient(var(--grid-color) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            border: 4px solid #444;
+            background-image: radial-gradient(circle, #222 30%, transparent 35%);
             background-size: 10px 10px;
             overflow: hidden;
             flex: 0 0 auto;
             transition: width 0.3s, height 0.3s;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
 
         .logo-obj {
             position: absolute;
-            transform-origin: center center;
+            /* Origin set dynamically in JS */
             left: 0;
             top: 0;
             z-index: 10;
+            image-rendering: pixelated;
         }
 
+        /* UPDATED: Box Shadow instead of Border to prevent layout shifts */
         .logo-editable {
             cursor: move;
-            border: 1px dashed rgba(255, 255, 255, 0.5);
             user-select: none;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+            /* Subtle outline */
         }
 
         .logo-editable:hover {
-            border-color: #00ff00;
+            box-shadow: 0 0 0 1px #00ff00;
         }
 
         .logo-editable.resizing {
             cursor: ns-resize !important;
-            border-color: #00ccff;
-            border-style: solid;
+            box-shadow: 0 0 0 1px #00ccff;
         }
 
         .logo-static {
             cursor: default;
-            border: 1px dotted rgba(255, 255, 255, 0.1);
             pointer-events: none;
             opacity: 0.8;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
         }
 
         .gradient-layer {
@@ -133,13 +135,14 @@
 
         .anchor-marker {
             position: absolute;
-            width: 10px;
-            height: 10px;
-            background: rgba(255, 0, 0, 0.5);
+            width: 6px;
+            height: 6px;
+            background: rgba(255, 0, 0, 0.9);
             border-radius: 50%;
             transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 25;
+            box-shadow: 0 0 4px #ff0000;
         }
 
         /* Controls CSS */
@@ -208,7 +211,6 @@
             background: #cc3300;
         }
 
-        /* Emulator Specific */
         .emulator-header {
             width: 100%;
             display: flex;
@@ -217,7 +219,6 @@
             flex: 0 0 auto;
         }
 
-        /* New container for header buttons */
         .emu-controls {
             display: flex;
             gap: 10px;
@@ -333,29 +334,20 @@
         <hr style="border-color:#444; width:100%">
         <div>
             <label style="color:var(--accent)">Main Team (Editing)</label>
-            <select id="teamSelect" onchange="updateUI()">
-                {% for team in teams %}
-                <option value="{{ team }}">{{ team }}</option>
-                {% endfor %}
-            </select>
+            <select id="teamSelect" onchange="updateUI()"></select>
         </div>
         <div class="row">
             <div>
                 <label>Main Stance</label>
                 <select id="stanceSelect" onchange="updateUI()">
-                    <option value="home">Home (Left)</option>
-                    <option value="away">Away (Right)</option>
+                    <option value="away">Away (Left)</option>
+                    <option value="home" selected>Home (Right)</option>
                 </select>
             </div>
         </div>
         <div style="margin-top:15px;">
             <label style="color:#aaa">Opponent (Visual Only)</label>
-            <select id="team2Select" onchange="updateUI()">
-                <option value="">(None)</option>
-                {% for team in teams %}
-                <option value="{{ team }}">{{ team }}</option>
-                {% endfor %}
-            </select>
+            <select id="team2Select" onchange="updateUI()"></select>
         </div>
         <div class="checkbox-row" style="margin-top: 15px;">
             <input type="checkbox" id="showGradient" checked onchange="toggleGradient()">
@@ -379,6 +371,20 @@
                 <input type="number" id="posY" value="0" oninput="updateLogoFromInput()">
             </div>
         </div>
+
+        <div class="row" style="margin-bottom: 15px;">
+            <div>
+                <label style="color:#888; font-size:0.8em;">Actual X (on Panel)</label>
+                <input type="text" id="absX" readonly
+                    style="color:#aaa; background:#222; border-color:#333; cursor:default;">
+            </div>
+            <div>
+                <label style="color:#888; font-size:0.8em;">Actual Y (on Panel)</label>
+                <input type="text" id="absY" readonly
+                    style="color:#aaa; background:#222; border-color:#333; cursor:default;">
+            </div>
+        </div>
+
         <div class="row">
             <div>
                 <label>Zoom (%)</label>
@@ -445,11 +451,14 @@
 
     <script>
         let currentConfig = {};
+        let layoutConfig = {};
         let currentFileName = "";
         let matrixW = 64;
         let matrixH = 32;
         const EDITOR_SCALE = 10;
         const EMU_SCALE = {{ emulator_pixel_size }};
+        const STANDARD_TEAMS = {{ teams | tojson }};
+
         let opponentConfig = null;
         let emulatorRunning = false;
 
@@ -471,7 +480,40 @@
             setupDrag();
         });
 
-        // --- Emulator Logic ---
+        function parseLayoutCoord(def, dimensionSize) {
+            if (Array.isArray(def)) {
+                let base = def[0];
+                let offset = def[1];
+                let pixelBase = 0;
+                if (typeof base === 'string' && base.includes('%')) {
+                    const pct = parseFloat(base) / 100.0;
+                    pixelBase = dimensionSize * pct;
+                } else {
+                    pixelBase = base;
+                }
+                return pixelBase + offset;
+            } else if (typeof def === 'string' && def.includes('%')) {
+                const pct = parseFloat(def) / 100.0;
+                return dimensionSize * pct;
+            } else {
+                return def;
+            }
+        }
+
+        function updateActualCoordinates() {
+            const stance = document.getElementById('stanceSelect').value;
+            const anchor = getAnchorPoint(stance);
+            const offsetX = parseInt(document.getElementById('posX').value) || 0;
+            const offsetY = parseInt(document.getElementById('posY').value) || 0;
+
+            const absX = Math.round(anchor.x + offsetX);
+            const absY = Math.round(anchor.y + offsetY);
+
+            document.getElementById('absX').value = absX;
+            document.getElementById('absY').value = absY;
+        }
+
+        // --- Core Logic ---
 
         function checkEmulatorStatus(isInit = false) {
             fetch('/api/emulator/status')
@@ -485,7 +527,6 @@
                             const activeW = data.w;
                             const activeH = data.h;
                             const sizeStr = `${activeW}x${activeH}`;
-
                             const sel = document.getElementById('sizeSelect');
                             let found = false;
                             for (let i = 0; i < sel.options.length; i++) {
@@ -495,12 +536,9 @@
                                     break;
                                 }
                             }
-
                             matrixW = activeW;
                             matrixH = activeH;
-
                             loadMatrixSize(false);
-
                             const el = document.getElementById('emuWrapper');
                             el.classList.remove('collapsed');
                             const iframe = document.getElementById('emuFrame');
@@ -524,15 +562,12 @@
         function launchEmulator() {
             const status = document.getElementById('statusMsg');
             status.innerText = "Launching Emulator...";
-
             const loader = document.getElementById('emuLoader');
             const iframe = document.getElementById('emuFrame');
             const wrapper = document.getElementById('emuWrapper');
-
             wrapper.classList.remove('collapsed');
             loader.style.display = 'flex';
             iframe.src = 'about:blank';
-
             fetch('/api/emulator/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -543,13 +578,11 @@
                     if (res.status === 'success') {
                         status.innerText = "Emulator Started!";
                         status.style.color = "lightgreen";
-
                         setTimeout(() => {
                             iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
                             iframe.onload = () => { loader.style.display = 'none'; };
                             setTimeout(() => { loader.style.display = 'none'; }, 2000);
                         }, 2000);
-
                         checkEmulatorStatus();
                     } else {
                         status.innerText = "Error: " + res.message;
@@ -577,27 +610,21 @@
         function loadMatrixSize(userTriggered = false) {
             const sizeStr = document.getElementById('sizeSelect').value;
             const [w, h] = sizeStr.split('x').map(Number);
-
             matrixW = w;
             matrixH = h;
-
             const pixelW = matrixW * EDITOR_SCALE;
             const pixelH = matrixH * EDITOR_SCALE;
-
             const canvas = document.getElementById('canvasContainer');
             canvas.style.width = pixelW + 'px';
             canvas.style.height = pixelH + 'px';
             canvas.style.backgroundSize = `${EDITOR_SCALE}px ${EDITOR_SCALE}px`;
-
             const inner = document.getElementById('emuInner');
             const emuW = matrixW * EMU_SCALE;
             const emuH = matrixH * EMU_SCALE;
             inner.style.width = emuW + 'px';
             inner.style.height = emuH + 'px';
-
             const emuWrap = document.getElementById('emuWrapper');
             emuWrap.style.width = (emuW + 20) + 'px';
-
             document.getElementById('resDisplay').innerText = `(${matrixW}x${matrixH})`;
 
             updateOverlayTextSizes();
@@ -611,29 +638,36 @@
                 gradImg.style.display = 'none';
             }
 
-            const expectedFile = `logos_${sizeStr}.json`;
-            const sel = document.getElementById('fileSelect');
-            let optionFound = false;
-
-            for (let i = 0; i < sel.options.length; i++) {
-                if (sel.options[i].value === expectedFile) {
-                    sel.selectedIndex = i;
-                    optionFound = true;
-                    break;
-                }
-            }
-
-            if (!optionFound) {
-                const opt = document.createElement('option');
-                opt.value = expectedFile;
-                opt.textContent = expectedFile;
-                sel.appendChild(opt);
-                sel.value = expectedFile;
-            } else {
-                sel.value = expectedFile;
-            }
-
-            loadConfig(expectedFile);
+            fetch(`/api/config/layout_${sizeStr}.json`)
+                .then(r => r.json())
+                .then(layoutData => {
+                    layoutConfig = layoutData;
+                    const expectedFile = `logos_${sizeStr}.json`;
+                    const sel = document.getElementById('fileSelect');
+                    let optionFound = false;
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value === expectedFile) {
+                            sel.selectedIndex = i;
+                            optionFound = true;
+                            break;
+                        }
+                    }
+                    if (!optionFound) {
+                        const opt = document.createElement('option');
+                        opt.value = expectedFile;
+                        opt.textContent = expectedFile;
+                        sel.appendChild(opt);
+                        sel.value = expectedFile;
+                    } else {
+                        sel.value = expectedFile;
+                    }
+                    loadConfig(expectedFile);
+                })
+                .catch(err => {
+                    console.error("Failed to load layout config", err);
+                    layoutConfig = {};
+                    loadConfig(`logos_${sizeStr}.json`);
+                });
 
             if (userTriggered && emulatorRunning) {
                 if (confirm(`Matrix size changed to ${sizeStr}. Restart the emulator with this resolution?`)) {
@@ -648,6 +682,8 @@
             const sizeStr = document.getElementById('sizeSelect').value;
             if (sizeStr === '64x32' || sizeStr === '128x64') {
                 gradImg.style.display = showGrad ? 'block' : 'none';
+            } else {
+                gradImg.style.display = 'none';
             }
         }
 
@@ -674,38 +710,105 @@
             const filename = specificFilename || document.getElementById('fileSelect').value;
             if (!filename) return;
             currentFileName = filename;
-
             document.getElementById('adjustmentsFile').innerText = `(${filename})`;
-
             fetch('/api/config/' + filename + '?t=' + new Date().getTime())
                 .then(r => r.json())
                 .then(data => {
                     currentConfig = data;
+                    refreshTeamList();
                     updateUI();
                 })
                 .catch(err => console.error("Config load failed", err));
         }
 
+        function refreshTeamList() {
+            const sel1 = document.getElementById('teamSelect');
+            const sel2 = document.getElementById('team2Select');
+            const cur1 = sel1.value;
+            const cur2 = sel2.value;
+            const options = [];
+            STANDARD_TEAMS.forEach(t => options.push({ label: t, value: t }));
+            if (currentConfig.scoreboard && currentConfig.scoreboard.logos) {
+                const logos = currentConfig.scoreboard.logos;
+                STANDARD_TEAMS.forEach(team => {
+                    if (logos[team] && logos[team].alt) {
+                        options.push({ label: `${team} (Alt)`, value: `${team}|alt` });
+                    }
+                });
+                Object.keys(logos).forEach(k => {
+                    if (k.startsWith('_')) return;
+                    if (!STANDARD_TEAMS.includes(k) && !k.includes('|')) {
+                        if (!options.find(o => o.value === k)) {
+                            options.push({ label: k, value: k });
+                        }
+                    }
+                });
+            }
+            options.sort((a, b) => a.label.localeCompare(b.label));
+            sel1.innerHTML = '';
+            sel2.innerHTML = '<option value="">(None)</option>';
+            options.forEach(opt => {
+                const el1 = document.createElement('option');
+                el1.value = opt.value;
+                el1.innerText = opt.label;
+                sel1.appendChild(el1);
+                const el2 = document.createElement('option');
+                el2.value = opt.value;
+                el2.innerText = opt.label;
+                sel2.appendChild(el2);
+            });
+            if (cur1) sel1.value = cur1;
+            if (cur2) sel2.value = cur2;
+            if (sel1.selectedIndex === -1 && options.length > 0) sel1.selectedIndex = 0;
+        }
+
         function getTeamConfig(team, stance) {
             if (!currentConfig.scoreboard || !currentConfig.scoreboard.logos) return {};
+            let mainKey = team;
+            let subKey = null;
+            if (team.includes('|')) {
+                const parts = team.split('|');
+                mainKey = parts[0];
+                subKey = parts[1];
+            }
             const logos = currentConfig.scoreboard.logos;
-            if (logos[team]) {
-                if (logos[team][stance]) return logos[team][stance];
-                if (logos[team].position) return logos[team];
+            if (subKey) {
+                if (logos[mainKey] && logos[mainKey][subKey]) {
+                    const altObj = logos[mainKey][subKey];
+                    if (altObj[stance]) return altObj[stance];
+                    return altObj;
+                }
+                return null;
+            }
+            if (logos[mainKey]) {
+                if (logos[mainKey][stance]) return logos[mainKey][stance];
+                if (logos[mainKey].position) return logos[mainKey];
             }
             return null;
         }
 
         function updateUI() {
-            const team1 = document.getElementById('teamSelect').value;
+            const team1Val = document.getElementById('teamSelect').value;
             const stance1 = document.getElementById('stanceSelect').value;
-            const team2 = document.getElementById('team2Select').value;
+            const team2Val = document.getElementById('team2Select').value;
             const sizeStr = document.getElementById('sizeSelect').value;
 
-            const img1 = document.getElementById('logoImg');
-            img1.src = `/assets/logos/${team1}/light/${sizeStr}.png`;
+            const getImageSrc = (val) => {
+                if (!val) return '';
+                let team = val;
+                let type = 'light';
+                if (val.includes('|')) {
+                    const parts = val.split('|');
+                    team = parts[0];
+                    type = parts[1];
+                }
+                return `/assets/logos/${team}/${type}/${sizeStr}.png`;
+            };
 
-            let conf1 = getTeamConfig(team1, stance1);
+            const img1 = document.getElementById('logoImg');
+            img1.src = getImageSrc(team1Val);
+
+            let conf1 = getTeamConfig(team1Val, stance1);
             if (!conf1) conf1 = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
             let z = conf1.zoom || "100%";
             if (typeof z === 'string') z = parseInt(z.replace('%', ''));
@@ -717,13 +820,16 @@
             img1.dataset.flip = conf1.flip || 0;
 
             const img2 = document.getElementById('logoImg2');
-            if (team2) {
+            if (team2Val) {
                 img2.style.display = 'block';
-                img2.src = `/assets/logos/${team2}/light/${sizeStr}.png`;
+                img2.src = getImageSrc(team2Val);
+
+                // Forces opponent to use opposite stance
                 const stance2 = (stance1 === 'home') ? 'away' : 'home';
-                let conf2 = getTeamConfig(team2, stance2);
-                if (!conf2) conf2 = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
-                opponentConfig = conf2;
+
+                let rawOppConf = getTeamConfig(team2Val, stance2);
+                if (!rawOppConf) rawOppConf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
+                opponentConfig = { ...rawOppConf };
                 opponentConfig.stance = stance2;
             } else {
                 img2.style.display = 'none';
@@ -733,9 +839,25 @@
         }
 
         function getAnchorPoint(stance) {
-            const midY = matrixH / 2;
-            if (stance === 'home') return { x: matrixW * 0.25, y: midY };
-            else return { x: matrixW * 0.75, y: midY };
+            let x = (stance === 'away') ? matrixW * 0.25 : matrixW * 0.75;
+            let y = 0;
+            // CORRECTED DEFAULTS: Away (Left side) -> Aligned Right (growing Left from center)
+            let align = (stance === 'away') ? 'right' : 'left';
+
+            if (layoutConfig && (layoutConfig.home_logo || layoutConfig.away_logo)) {
+                const key = (stance === 'home') ? 'home_logo' : 'away_logo';
+                if (layoutConfig[key]) {
+                    if (layoutConfig[key].position) {
+                        const posDef = layoutConfig[key].position;
+                        x = parseLayoutCoord(posDef[0], matrixW);
+                        y = parseLayoutCoord(posDef[1], matrixH);
+                    }
+                    if (layoutConfig[key].align) {
+                        align = layoutConfig[key].align;
+                    }
+                }
+            }
+            return { x: x, y: y, align: align };
         }
 
         function renderVisuals() {
@@ -750,6 +872,7 @@
             const flip = parseInt(img1.dataset.flip);
 
             const anchor1 = getAnchorPoint(stance1);
+
             const screenAnchorX = anchor1.x * EDITOR_SCALE;
             const screenAnchorY = anchor1.y * EDITOR_SCALE;
 
@@ -759,27 +882,45 @@
             const finalX = screenAnchorX + (offsetX * EDITOR_SCALE);
             const finalY = screenAnchorY + (offsetY * EDITOR_SCALE);
 
-            const baseSize = matrixH * EDITOR_SCALE;
-
-            applyTransform(img1, finalX, finalY, baseSize, zoom, rot, flip);
+            applyTransform(img1, finalX, finalY, zoom, rot, flip, anchor1.align);
 
             if (opponentConfig) {
                 const img2 = document.getElementById('logoImg2');
                 const anchor2 = getAnchorPoint(opponentConfig.stance);
+
                 let z2 = opponentConfig.zoom || "100%";
                 if (typeof z2 === 'string') z2 = parseInt(z2.replace('%', ''));
                 z2 = z2 / 100;
+
                 const pos2 = opponentConfig.position || [0, 0];
                 const finalX2 = (anchor2.x * EDITOR_SCALE) + (pos2[0] * EDITOR_SCALE);
                 const finalY2 = (anchor2.y * EDITOR_SCALE) + (pos2[1] * EDITOR_SCALE);
-                applyTransform(img2, finalX2, finalY2, baseSize, z2, opponentConfig.rotate || 0, opponentConfig.flip || 0);
+
+                applyTransform(img2, finalX2, finalY2, z2, opponentConfig.rotate || 0, opponentConfig.flip || 0, anchor2.align);
             }
+
+            updateActualCoordinates();
         }
 
-        function applyTransform(img, x, y, size, zoom, rot, flip) {
-            img.style.width = size + 'px';
-            img.style.height = 'auto';
-            img.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${zoom}) rotate(${rot}deg) ${flip ? 'scaleX(-1)' : ''}`;
+        function applyTransform(img, x, y, zoom, rot, flip, align) {
+            img.style.left = x + 'px';
+            img.style.top = y + 'px';
+
+            // Ensure proper origin logic
+            img.style.transformOrigin = (align === 'right') ? 'top right' : 'top left';
+
+            let alignTranslate = 'translate(0, 0)';
+            if (align === 'right') alignTranslate = 'translate(-100%, 0)';
+            if (align === 'center') alignTranslate = 'translate(-50%, 0)';
+
+            const finalScale = zoom * EDITOR_SCALE;
+
+            img.style.transform = `
+            ${alignTranslate} 
+            scale(${finalScale}) 
+            rotate(${rot}deg) 
+            ${flip ? 'scaleX(-1)' : ''}
+        `;
         }
 
         function updateLogoFromInput() { renderVisuals(); }
@@ -796,10 +937,8 @@
             const stance = document.getElementById('stanceSelect').value;
             let conf = getTeamConfig(team, stance);
             if (!conf) conf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
-
             let z = conf.zoom || "100%";
             if (typeof z === 'string') z = parseInt(z.replace('%', ''));
-
             document.getElementById('posX').value = conf.position ? conf.position[0] : 0;
             document.getElementById('posY').value = conf.position ? conf.position[1] : 0;
             document.getElementById('zoom').value = z;
@@ -810,16 +949,14 @@
         }
 
         function saveConfig() {
-            const team = document.getElementById('teamSelect').value;
+            const teamVal = document.getElementById('teamSelect').value;
             const stance = document.getElementById('stanceSelect').value;
             const filename = currentFileName;
             const status = document.getElementById('statusMsg');
-
             if (!filename) {
                 status.innerText = "No file selected.";
                 return;
             }
-
             const newObj = {
                 zoom: document.getElementById('zoom').value + "%",
                 position: [
@@ -830,13 +967,23 @@
                 flip: parseInt(document.getElementById('logoImg').dataset.flip),
                 crop: [0, 0, 0, 0]
             };
-
             if (!currentConfig.scoreboard) currentConfig.scoreboard = {};
             if (!currentConfig.scoreboard.logos) currentConfig.scoreboard.logos = {};
-            if (!currentConfig.scoreboard.logos[team]) currentConfig.scoreboard.logos[team] = {};
-
-            currentConfig.scoreboard.logos[team][stance] = newObj;
-
+            let mainKey = teamVal;
+            let subKey = null;
+            if (teamVal.includes('|')) {
+                const parts = teamVal.split('|');
+                mainKey = parts[0];
+                subKey = parts[1];
+            }
+            if (subKey) {
+                if (!currentConfig.scoreboard.logos[mainKey]) currentConfig.scoreboard.logos[mainKey] = {};
+                if (!currentConfig.scoreboard.logos[mainKey][subKey]) currentConfig.scoreboard.logos[mainKey][subKey] = {};
+                currentConfig.scoreboard.logos[mainKey][subKey][stance] = newObj;
+            } else {
+                if (!currentConfig.scoreboard.logos[mainKey]) currentConfig.scoreboard.logos[mainKey] = {};
+                currentConfig.scoreboard.logos[mainKey][stance] = newObj;
+            }
             fetch('/api/config/' + filename, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -869,7 +1016,6 @@
                 if (e.key === 'Shift') img.classList.remove('resizing');
             });
 
-            // Wheel Zoom
             img.addEventListener('wheel', e => {
                 e.preventDefault();
                 let z = parseInt(document.getElementById('zoom').value) || 100;
@@ -932,7 +1078,6 @@
             window.addEventListener('mouseup', () => {
                 if (isResizing) {
                     isResizing = false;
-                    // If shift released during drag, remove class
                     if (!window.event || !window.event.shiftKey) img.classList.remove('resizing');
                 }
                 if (isDragging) {

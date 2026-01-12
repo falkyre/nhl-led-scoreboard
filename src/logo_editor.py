@@ -3,6 +3,7 @@ import json
 import re
 import io
 import urllib.request
+import urllib.error
 import shutil
 import datetime
 import subprocess
@@ -79,7 +80,6 @@ TEAMS = [
 @app.route('/')
 def index():
     emulator_port = 8888
-    # Default pixel size if not found in config
     emulator_pixel_size = 10 
     
     if os.path.exists(EMULATOR_CONFIG_PATH):
@@ -87,8 +87,6 @@ def index():
             with open(EMULATOR_CONFIG_PATH, 'r') as f:
                 data = json.load(f)
                 emulator_port = data.get('browser', {}).get('port', 8888)
-                
-                # Check various locations for pixel_size
                 if 'pixel_size' in data:
                     emulator_pixel_size = int(data['pixel_size'])
                 elif 'display' in data and 'pixel_size' in data['display']:
@@ -176,6 +174,7 @@ def emulator_stop():
 @app.route('/api/files')
 def list_files():
     try:
+        # Only list logos_*.json for the main dropdown
         files = [f for f in os.listdir(CONFIG_DIR) if f.startswith('logos') and f.endswith('.json')]
     except FileNotFoundError:
         files = []
@@ -187,16 +186,20 @@ def handle_config(filename):
     
     if request.method == 'GET':
         if not os.path.exists(file_path):
-            base_file = os.path.join(CONFIG_DIR, 'logos_64x32.json')
-            if os.path.exists(base_file):
-                try:
-                    with open(base_file, 'r') as f:
-                        base_data = json.load(f)
-                    with open(file_path, 'w') as f:
-                        json.dump(base_data, f, indent=2)
-                except Exception as e:
-                    return jsonify({"status": "error", "message": str(e)}), 500
-            else:
+            # If requesting a missing logos_ file, create from default
+            if filename.startswith('logos_'):
+                base_file = os.path.join(CONFIG_DIR, 'logos_64x32.json')
+                if os.path.exists(base_file):
+                    try:
+                        with open(base_file, 'r') as f:
+                            base_data = json.load(f)
+                        with open(file_path, 'w') as f:
+                            json.dump(base_data, f, indent=2)
+                    except Exception as e:
+                        return jsonify({"status": "error", "message": str(e)}), 500
+            
+            # If it's a layout_ file or other that doesn't exist, return empty
+            if not os.path.exists(file_path):
                 return jsonify({})
 
         with open(file_path, 'r') as f:
@@ -220,15 +223,37 @@ def serve_assets(filename):
     if os.path.exists(full_path):
         return send_from_directory(ASSETS_DIR, filename)
     
-    match = re.search(r'logos/([^/]+)/light/(\d+)x(\d+)\.png', filename)
+    match = re.search(r'logos/([^/]+)/([^/]+)/(\d+)x(\d+)\.png', filename)
+    
     if match and cairosvg:
         team = match.group(1)
-        w = int(match.group(2))
-        h = int(match.group(3))
-        svg_url = f"https://assets.nhle.com/logos/nhl/svg/{team}_light.svg"
+        logo_type = match.group(2)
+        w = int(match.group(3))
+        h = int(match.group(4))
+        
+        svg_suffix = 'light'
+        if logo_type in ['alt', 'dark']:
+            svg_suffix = 'dark'
+            
+        svg_url = f"https://assets.nhle.com/logos/nhl/svg/{team}_{svg_suffix}.svg"
+        
         try:
             with urllib.request.urlopen(svg_url) as response:
                 svg_data = response.read()
+        except urllib.error.HTTPError:
+            if svg_suffix == 'dark':
+                fallback_url = f"https://assets.nhle.com/logos/nhl/svg/{team}_light.svg"
+                try:
+                    with urllib.request.urlopen(fallback_url) as response:
+                        svg_data = response.read()
+                except:
+                    return abort(404)
+            else:
+                return abort(404)
+        except:
+            return abort(404)
+
+        try:
             png_data = cairosvg.svg2png(bytestring=svg_data, output_height=512)
             with Image.open(io.BytesIO(png_data)) as img:
                 img.thumbnail((w, h), Image.Resampling.LANCZOS)
@@ -236,11 +261,14 @@ def serve_assets(filename):
                 ox = (w - img.width) // 2
                 oy = (h - img.height) // 2
                 final_img.paste(img, (ox, oy))
+                
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 final_img.save(full_path)
+                
             return send_from_directory(ASSETS_DIR, filename)
         except:
-            pass
+             pass
+
     return abort(404)
 
 if __name__ == '__main__':
