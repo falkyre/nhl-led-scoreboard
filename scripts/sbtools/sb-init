@@ -40,7 +40,7 @@ cd "${DIR}/../.."
 
 # Check for armv6l architecture
 if [ "$ARCH" = "armv6l" ]; then
-  tput bold; echo "$(tput setaf 9)Sorry, This project will only run on a Raspberry Pi Zero 2w to a Raspberry Pi 4. Raspberry Pi Zero is not supported.$(tput setaf 9)" ; tput sgr0
+  tput bold; echo "$(tput setaf 9)Sorry, This project will only run on a Raspberry Pi Zero 2w to a Raspberry Pi 5. Raspberry Pi Zero is not supported.$(tput setaf 9)" ; tput sgr0
   exit 1
 fi
 
@@ -186,6 +186,9 @@ else
         echo 'SUBSYSTEM=="*-pio", GROUP="gpio", MODE="0660"' | sudo tee /etc/udev/rules.d/99-com.rules > /dev/null
         tput bold; echo "$(tput setaf 1)IMPORTANT: You will need to REBOOT before using the LED Matrix module!$(tput setaf 9)" ; tput sgr0
     fi
+    # Copy the pi5_emulator_config.json over the emulator_config.json
+    echo "$(tput setaf 2)Copying pi5_emulator_config.json to emulator_config.json...$(tput setaf 9)" ; tput sgr0
+    cp pi5_emulator_config.json emulator_config.json
 fi
 
 tput bold; echo "$(tput setaf 4)Blacklisting sound module...$(tput setaf 9)" ; tput sgr0
@@ -251,4 +254,7 @@ fi
 
 tput bold; echo "$(tput setaf 6)If you didn't see any errors above, everything should be installed!"; tput sgr0
 echo "$(tput bold)$(tput smso)$(tput setaf 2)Installation complete!$(tput sgr0) Reboot, then Play around with the examples in nhl-led-scoreboard/submodules/matrix/bindings/python/samples to make sure your matrix is working."
+if [ "$IS_PI5" = true ]; then
+  echo "$(tput bold)$(tput smso)$(tput setaf 2)Running on the Raspberry Pi 5, use python3 src/pi5_launcher.py to launch the scoreboard!$(tput sgr0)"
+fi
 
