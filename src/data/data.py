@@ -480,8 +480,29 @@ class Data:
 
     def refresh_overview(self):
         """
-            Get all the data of the main event.
+        Get all the data of the main event.
+
+        Uses cache-first approach: tries LiveGameWorker cache first,
+        falls back to direct API call if cache miss.
         """
+        # Try to use cached data from LiveGameWorker first
+        from nhl_api.workers import LiveGameWorker
+        cached_overview = LiveGameWorker.get_cached_overview(self.current_game_id)
+
+        if cached_overview:
+            debug.debug(f"refresh_overview: Using cached data from LiveGameWorker for game {self.current_game_id}")
+            self.overview = cached_overview
+
+            # Update timestamp tracking
+            if self.time_stamp != self.overview["clock"]["timeRemaining"]:
+                self.time_stamp = self.overview["clock"]["timeRemaining"]
+                self.new_data = True
+            self.needs_refresh = False
+            self.network_issues = False
+            return
+
+        # Cache miss - fetch from API as fallback
+        debug.debug(f"refresh_overview: Cache miss, fetching from API for game {self.current_game_id}")
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:

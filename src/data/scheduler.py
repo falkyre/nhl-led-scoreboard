@@ -95,6 +95,10 @@ class SchedulerManager:
         self.sleep_event = sleep_event
         self.commandArgs = args()
 
+        # Initialize LiveGameWorker instance (not monitoring yet)
+        from nhl_api.workers import LiveGameWorker
+        self.data.live_game_worker = LiveGameWorker(data, data.scheduler)
+
     def _get_existing_job_ids(self) -> List[str]:
         """Return list of job ids currently in the scheduler (defensive)."""
         jobs = self.list_jobs()
