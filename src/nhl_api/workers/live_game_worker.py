@@ -166,15 +166,19 @@ class LiveGameWorker:
             elif is_intermission:
                 # Intermission - slower refresh
                 new_interval = 30
+                debug.debug(f"LiveGameWorker: Intermission detected, using 30-second refresh")
             elif game_state == 'LIVE':
                 # Active play - fast refresh
                 new_interval = 5
+                debug.debug(f"LiveGameWorker: Live play detected, using 5-second refresh")
             elif game_state in ['PRE', 'FUT']:
                 # Pre-game - moderate refresh
                 new_interval = 30
+                debug.debug(f"LiveGameWorker: Pre-game state ({game_state}), using 30-second refresh")
             else:
                 # Unknown state - use default
                 new_interval = 10
+                debug.debug(f"LiveGameWorker: Unknown state ({game_state}), using 10-second refresh")
 
             # Update interval if changed
             if new_interval != self.current_refresh_seconds:
@@ -187,7 +191,9 @@ class LiveGameWorker:
                         seconds=new_interval,
                         jitter=1
                     )
-                    debug.info(f"LiveGameWorker: Adjusted refresh to {new_interval}s (state: {game_state})")
+                    # Show intermission status in log for clarity
+                    state_display = f"{game_state} (Intermission)" if is_intermission else game_state
+                    debug.info(f"LiveGameWorker: Adjusted refresh to {new_interval}s (state: {state_display})")
                 except Exception as e:
                     debug.error(f"LiveGameWorker: Failed to reschedule: {e}")
 

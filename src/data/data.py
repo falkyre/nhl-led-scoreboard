@@ -298,7 +298,7 @@ class Data:
             teams_data[team.details.abbrev] = team
         return teams_data
 
-    def refresh_games(self):
+    def refresh_games(self, fetch_team_schedule=True):
         """
             Refresh the current list of games of the day.
 
@@ -308,6 +308,10 @@ class Data:
             If the user want's to rotate only his preferred games between the periods and during the day, save those
             only. Lastly, If if not an Off day for the pref teams, reorder the list in order of preferred teams and load
             the first game as the main event.
+
+            Args:
+                fetch_team_schedule: If True, fetch previous/next game for team_summary board.
+                                     Set to False during live game loops to avoid unnecessary API calls.
 
             TODO:
                 Add the option to start the earliest game in the preferred game list
@@ -341,12 +345,14 @@ class Data:
                 self.pref_games = filter_list_of_games(self.games, self.pref_teams)
 
                 # Populate the TeamInfo classes used for the team_summary board
-                for team_id in self.pref_teams:
-                    #import pdb; pdb.set_trace()
-                    team_info = self.teams_info[team_id].details
-                    pg, ng = nhl_info.team_previous_game(team_info.abbrev, str(date.today()))
-                    team_info.previous_game = pg
-                    team_info.next_game = ng
+                # Skip this during live game loops (expensive API call, only needed for team_summary board)
+                if fetch_team_schedule:
+                    for team_id in self.pref_teams:
+                        #import pdb; pdb.set_trace()
+                        team_info = self.teams_info[team_id].details
+                        pg, ng = nhl_info.team_previous_game(team_info.abbrev, str(date.today()))
+                        team_info.previous_game = pg
+                        team_info.next_game = ng
 
                 if self.config.preferred_teams_only and self.pref_teams:
                     self.games = self.pref_games
@@ -691,8 +697,14 @@ class Data:
     def is_nhl_offday(self):
         return len(self.games) == 0
 
-    def refresh_data(self):
+    def refresh_data(self, fetch_team_schedule=True):
+        """
+        Refresh game data for today.
 
+        Args:
+            fetch_team_schedule: If True, fetch previous/next game for team_summary board.
+                                 Set to False during live game loops to avoid unnecessary API calls.
+        """
         debug.info("refreshing data")
         # Flag to determine when to refresh data
         self.needs_refresh = True
@@ -704,7 +716,7 @@ class Data:
         self.refresh_current_date()
 
         # Update games for today
-        self.refresh_games()
+        self.refresh_games(fetch_team_schedule=fetch_team_schedule)
 
     def refresh_daily(self):
         debug.info('refreshing daily data')
