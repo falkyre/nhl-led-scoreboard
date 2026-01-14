@@ -11,7 +11,7 @@ from api.weather.ecWeather import ecWxWorker
 from api.weather.nwsAlerts import nwsWxAlerts
 from api.weather.owmWeather import owmWxWorker
 from api.weather.wxForecast import wxForecast
-from nhl_api.workers import StandingsWorker, StatsLeadersWorker
+from nhl_api.workers import GamesWorker, StandingsWorker, StatsLeadersWorker
 from sbio.dimmer import Dimmer
 from sbio.screensaver import screenSaver
 from update_checker import UpdateChecker
@@ -86,6 +86,7 @@ class SchedulerManager:
         "screenSaver_prefix": "screenSaver",
         "statsLeadersWorker": "statsLeadersWorker",
         "standingsWorker": "standingsWorker",
+        "gamesWorker": "gamesWorker",
     }
 
     def __init__(self, data, matrix, sleep_event):
@@ -295,6 +296,21 @@ class SchedulerManager:
             sb_logger.info(f"Scheduled standings worker (id={job_id})")
         else:
             sb_logger.debug(f"Standings worker already scheduled (id={job_id}), skipping add.")
+
+        # games worker
+        # Fetches today's games data for ticker display with adaptive refresh intervals
+        # Real-time live game data is handled separately by LiveGameWorker
+        job_id = self.KNOWN_JOB_IDS["gamesWorker"]
+        if not self._job_exists(job_id, existing_ids):
+            GamesWorker(
+                self.data,
+                self.data.scheduler,
+                refresh_seconds=60  # Base interval for ticker (adaptive: 1min-30min)
+            )
+            existing_ids.append(job_id)
+            sb_logger.info(f"Scheduled games worker with adaptive refresh (id={job_id})")
+        else:
+            sb_logger.debug(f"Games worker already scheduled (id={job_id}), skipping add.")
 
         # update checker
         if self.commandArgs.updatecheck:

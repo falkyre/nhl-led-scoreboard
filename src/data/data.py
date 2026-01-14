@@ -317,13 +317,24 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                date_obj = date(self.year, self.month, self.day)
-                data = get_score_details(date_obj)
+                # Try to use cached data from GamesWorker first (if available)
+                from nhl_api.workers import GamesWorker
+                cached_data = GamesWorker.get_cached_data()
+
+                if cached_data and cached_data.get('date') == date(self.year, self.month, self.day):
+                    # Use cached data - much faster and reduces API calls
+                    debug.debug("refresh_games: Using cached data from GamesWorker")
+                    data = {'games': cached_data['raw']}
+                else:
+                    # Fall back to fetching fresh data if cache miss or different day
+                    debug.debug("refresh_games: Cache miss, fetching fresh data")
+                    date_obj = date(self.year, self.month, self.day)
+                    data = get_score_details(date_obj)
+
                 if not data:
                     self.games = []
                     self.pref_games = []
                     return data
-
 
                 self.games = data["games"]
 

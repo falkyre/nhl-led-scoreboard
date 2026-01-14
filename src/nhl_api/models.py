@@ -403,8 +403,8 @@ class Game:
         except ValueError:
             state = GameState.FUTURE
 
-        # Parse game date
-        game_date_str = data.get('gameDate', data.get('startTimeUTC', ''))
+        # Parse game date - prefer startTimeUTC which has actual time, fallback to gameDate
+        game_date_str = data.get('startTimeUTC', data.get('gameDate', ''))
         try:
             game_date = datetime.fromisoformat(game_date_str.replace('Z', '+00:00'))
         except (ValueError, AttributeError):
