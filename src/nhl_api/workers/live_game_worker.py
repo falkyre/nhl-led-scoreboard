@@ -167,10 +167,10 @@ class LiveGameWorker:
                 # Intermission - slower refresh
                 new_interval = 30
                 debug.debug(f"LiveGameWorker: Intermission detected, using 30-second refresh")
-            elif game_state == 'LIVE':
-                # Active play - fast refresh
+            elif game_state in ['LIVE', 'CRIT']:
+                # Active play - fast refresh (CRIT = critical period, close game near end)
                 new_interval = 5
-                debug.debug(f"LiveGameWorker: Live play detected, using 5-second refresh")
+                debug.debug(f"LiveGameWorker: Live play detected ({game_state}), using 5-second refresh")
             elif game_state in ['PRE', 'FUT']:
                 # Pre-game - moderate refresh
                 new_interval = 30

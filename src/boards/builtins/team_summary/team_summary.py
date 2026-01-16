@@ -9,7 +9,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 
 from boards.base_board import BoardBase
-from nhl_api.workers import TeamSummaryWorker
+from nhl_api.workers import StandingsWorker, TeamScheduleWorker
 from renderer.logos import LogoRenderer
 from utils import convert_time, get_file
 
@@ -43,11 +43,13 @@ class TeamSummaryBoard(BoardBase):
         self.rotation_rate = self.get_config_value('rotation_rate', 5)
 
     def render(self):
-        # Get summary data from worker cache
-        summaries = TeamSummaryWorker.get_cached_data()
+        # Get schedule data from TeamScheduleWorker
+        schedules = TeamScheduleWorker.get_cached_data()
+        # Get standings data from StandingsWorker
+        standings = StandingsWorker.get_cached_data()
 
-        if not summaries:
-            debug.error("Team summary board unavailable due to missing data from worker cache")
+        if not schedules:
+            debug.error("Team summary board unavailable due to missing schedule data from worker cache")
             return
 
         self.matrix.clear()
@@ -56,20 +58,32 @@ class TeamSummaryBoard(BoardBase):
             if self.sleepEvent.is_set():
                 break
 
-            self._render_team(team_id, summaries)
+            self._render_team(team_id, schedules, standings)
 
-    def _render_team(self, team_id: int, summaries: dict):
+    def _render_team(self, team_id: int, schedules: dict, standings):
         """Render summary for a single team."""
-        # Get cached summary data for this team
-        summary_data = summaries.get(team_id)
-        if not summary_data:
-            debug.warning(f"Team {team_id} not found in worker cache")
+        # Get cached schedule data for this team
+        schedule_data = schedules.get(team_id)
+        if not schedule_data:
+            debug.warning(f"Team {team_id} not found in schedule worker cache")
             return
 
-        team_abbrev = summary_data.team_abbrev
-        record = summary_data.record
-        prev_game = summary_data.previous_game
-        next_game = summary_data.next_game
+        team_abbrev = schedule_data.team_abbrev
+        prev_game = schedule_data.previous_game
+        next_game = schedule_data.next_game
+
+        # Get record from standings worker (domain-specific data source)
+        record = None
+        if standings:
+            team_standing = standings.get_team_by_id(team_id)
+            if team_standing:
+                record = {
+                    'gamesPlayed': team_standing.games_played,
+                    'points': team_standing.points,
+                    'wins': team_standing.record.wins,
+                    'losses': team_standing.record.losses,
+                    'otLosses': team_standing.record.ot_losses
+                }
 
         # Get team colors
         bg_color = self.team_colors.color(f"{team_id}.primary")
