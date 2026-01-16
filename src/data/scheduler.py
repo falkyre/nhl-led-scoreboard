@@ -11,7 +11,7 @@ from api.weather.ecWeather import ecWxWorker
 from api.weather.nwsAlerts import nwsWxAlerts
 from api.weather.owmWeather import owmWxWorker
 from api.weather.wxForecast import wxForecast
-from nhl_api.workers import GamesWorker, StandingsWorker, StatsLeadersWorker
+from nhl_api.workers import GamesWorker, StandingsWorker, StatsLeadersWorker, TeamSummaryWorker
 from sbio.dimmer import Dimmer
 from sbio.screensaver import screenSaver
 from update_checker import UpdateChecker
@@ -87,6 +87,7 @@ class SchedulerManager:
         "statsLeadersWorker": "statsLeadersWorker",
         "standingsWorker": "standingsWorker",
         "gamesWorker": "gamesWorker",
+        "teamSummaryWorker": "teamSummaryWorker",
     }
 
     def __init__(self, data, matrix, sleep_event):
@@ -315,6 +316,20 @@ class SchedulerManager:
             sb_logger.info(f"Scheduled games worker with adaptive refresh (id={job_id})")
         else:
             sb_logger.debug(f"Games worker already scheduled (id={job_id}), skipping add.")
+
+        # team summary worker
+        # Fetches previous/next game data for preferred teams (used by team_summary board)
+        job_id = self.KNOWN_JOB_IDS["teamSummaryWorker"]
+        if not self._job_exists(job_id, existing_ids):
+            TeamSummaryWorker(
+                self.data,
+                self.data.scheduler,
+                refresh_minutes=30  # Refresh every 30 minutes
+            )
+            existing_ids.append(job_id)
+            sb_logger.info(f"Scheduled team summary worker (id={job_id})")
+        else:
+            sb_logger.debug(f"Team summary worker already scheduled (id={job_id}), skipping add.")
 
         # update checker
         if self.commandArgs.updatecheck:

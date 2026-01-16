@@ -266,8 +266,8 @@ class MainRenderer:
                 else:
                     print("somethin' really goofy")
                     self.sleepEvent.wait(self.refresh_rate)
-                # Refresh data without fetching team schedules (only needed for team_summary board)
-                self.data.refresh_data(fetch_team_schedule=False)
+                # Refresh game data (team schedules handled by TeamSummaryWorker)
+                self.data.refresh_data()
                 self.data.refresh_overview()
                 self.scoreboard = Scoreboard(self.data.overview, self.data)
                 if self.data.network_issues:

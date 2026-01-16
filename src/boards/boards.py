@@ -23,7 +23,6 @@ from boards.pbdisplay import pbDisplay
 from boards.player_stats import PlayerStatsRenderer
 from boards.screensaver import screenSaver
 from boards.seriesticker import Seriesticker
-from boards.team_summary import TeamSummary
 from boards.wxAlert import wxAlert
 from boards.wxForecast import wxForecast
 from boards.wxWeather import wxWeather
@@ -69,7 +68,6 @@ class Boards:
         """
         legacy_boards = {
             "seriesticker": Seriesticker,
-            "team_summary": TeamSummary,
             "clock": Clock,
             "pbdisplay": pbDisplay,
             "weather": wxWeather,
@@ -722,10 +720,6 @@ class Boards:
         pass
         # StanleyCupChampions(data, matrix, sleepEvent).render()
 
-
-    def team_summary(self, data, matrix, sleepEvent):
-        board = self._get_cached_board_instance("team_summary", TeamSummary, data, matrix, sleepEvent)
-        board.render()
 
     def clock(self, data, matrix, sleepEvent):
         board = self._get_cached_board_instance("clock", Clock, data, matrix, sleepEvent)
