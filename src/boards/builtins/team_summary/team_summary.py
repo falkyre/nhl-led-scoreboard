@@ -73,9 +73,10 @@ class TeamSummaryBoard(BoardBase):
         next_game = schedule_data.next_game
 
         # Get record from standings worker (domain-specific data source)
+        # Note: NHL standings API doesn't include team IDs, so we look up by abbreviation
         record = None
         if standings:
-            team_standing = standings.get_team_by_id(team_id)
+            team_standing = standings.get_team_by_abbrev(team_abbrev)
             if team_standing:
                 record = {
                     'gamesPlayed': team_standing.games_played,
@@ -84,6 +85,10 @@ class TeamSummaryBoard(BoardBase):
                     'losses': team_standing.record.losses,
                     'otLosses': team_standing.record.ot_losses
                 }
+            else:
+                debug.warning(f"TeamSummary: No standings found for {team_abbrev}")
+        else:
+            debug.warning(f"TeamSummary: No standings data available from cache")
 
         # Get team colors
         bg_color = self.team_colors.color(f"{team_id}.primary")
