@@ -1,7 +1,0 @@
-{
-    "text_color": [255, 165, 0],
-    "season_bg_color": [155, 155, 155],
-    "until_text": "DAYS TIL",
-    "display_seconds": 5,
-    "enabled": true
-}
