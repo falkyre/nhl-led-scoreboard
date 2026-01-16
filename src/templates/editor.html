@@ -308,6 +308,9 @@
             min-height: 1.2em;
         }
     </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
 
 <body>
@@ -430,14 +433,41 @@
         <div class="emulator-header">
             <h3>
                 <span id="emuStatusDot" class="status-dot"></span>
-                Live Emulator
+                Emulator
                 <span style="font-size:0.8em; color:#888;">(localhost:{{ emulator_port }})</span>
             </h3>
+
+            <!-- Emulator Mode Selection -->
+            <div>
+                <select id="emuMode" onchange="toggleEmulatorMode()"
+                    style="padding:4px; width:auto; background:#333; color:#fff; border:1px solid #555;">
+                    <option value="live">Live</option>
+                    <option value="simulator">Simulator</option>
+                </select>
+            </div>
 
             <div class="emu-controls">
                 <button onclick="launchEmulator()" style="background:#28a745;">Launch</button>
                 <button onclick="stopEmulator()" class="danger">Stop</button>
                 <button class="secondary" onclick="toggleEmulatorCollapse()">Collapse</button>
+            </div>
+        </div>
+
+        <!-- Simulator Options Panel -->
+        <div id="simOptions"
+            style="display:none; background:#222; padding:10px; border-bottom:1px solid #444; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div style="flex: 1 1 auto;">
+                <label style="font-size:0.8em; color:#aaa; margin-bottom:2px;">Game Date</label>
+                <input type="text" id="simDate" style="width:100%; padding:4px;" placeholder="Select Date...">
+            </div>
+            <div style="flex: 0 0 80px;">
+                <label style="font-size:0.8em; color:#aaa; margin-bottom:2px;">Speed x</label>
+                <input type="number" id="simSpeed" value="1.0" step="0.1" style="width:100%; padding:4px;">
+            </div>
+            <div style="display:flex; align-items:center; gap:5px; margin-top:15px;">
+                <input type="checkbox" id="simStopAtEnd" style="transform:scale(1.1);">
+                <label for="simStopAtEnd" style="font-size:0.8em; color:#aaa; margin-bottom:0; font-weight:normal;">Stop
+                    at End</label>
             </div>
         </div>
 
@@ -474,11 +504,135 @@
                         opt.textContent = f;
                         sel.appendChild(opt);
                     });
+
+                    // Restore state BEFORE verifying status
+                    loadState(files);
+
                     checkEmulatorStatus(true);
                 });
 
             setupDrag();
+
+            // Add listeners for saving state
+            document.getElementById('simSpeed').addEventListener('change', saveState);
+            document.getElementById('simStopAtEnd').addEventListener('change', saveState);
         });
+
+        // ... (parseLayoutCoord, updateActualCoordinates skipped) ...
+
+        function checkEmulatorStatus(isInit = false) {
+            // ... existing checks ...
+            // Logic inside checkEmulatorStatus calls loadMatrixSize(false)
+        }
+
+        // ... (skip down to loadMatrixSize) ...
+
+        function loadMatrixSize(userTriggered = false) {
+            const sizeStr = document.getElementById('sizeSelect').value;
+            // ... existing sizing logic ... 
+
+            // ... (fetch logic) ...
+            fetch(`/api/config/layout_${sizeStr}.json`)
+                .then(r => r.json())
+                .then(layoutData => {
+                    layoutConfig = layoutData;
+
+                    // File selection logic
+                    let expectedFile = `logos_${sizeStr}.json`;
+
+                    // Override with restored file if valid and matches size
+                    // Note: If user restored a 64x32 file but switched to 128x64, we might not want to restore it.
+                    // Simple check: if restored file is in the select options, verify it matches size?
+                    // Or just blindly trust user choice if it exists.
+                    if (window.restoreFile) {
+                        const sel = document.getElementById('fileSelect');
+                        // check if restoreFile exists in options
+                        let exists = false;
+                        for (let i = 0; i < sel.options.length; i++) {
+                            if (sel.options[i].value === window.restoreFile) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (exists) {
+                            expectedFile = window.restoreFile;
+                            window.restoreFile = null; // consume it
+                        }
+                    }
+
+                    const sel = document.getElementById('fileSelect');
+                    let optionFound = false;
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value === expectedFile) {
+                            sel.selectedIndex = i;
+                            optionFound = true;
+                            break;
+                        }
+                    }
+                    // Create if missing logic (existing) ...
+                    if (!optionFound) {
+                        const opt = document.createElement('option');
+                        opt.value = expectedFile;
+                        opt.textContent = expectedFile;
+                        sel.appendChild(opt);
+                        sel.value = expectedFile;
+                    } else {
+                        sel.value = expectedFile;
+                    }
+                    loadConfig(expectedFile);
+                })
+                .catch(err => {
+                    console.error("Failed to load layout config", err);
+                    layoutConfig = {};
+                    loadConfig(`logos_${sizeStr}.json`); // Fallback
+                });
+
+            if (userTriggered) saveState();
+
+            if (userTriggered && emulatorRunning) {
+                if (confirm(`Matrix size changed to ${sizeStr}. Restart the emulator with this resolution?`)) {
+                    launchEmulator();
+                }
+            }
+        }
+
+        function loadConfig(specificFilename = null) {
+            const filename = specificFilename || document.getElementById('fileSelect').value;
+            if (!filename) return;
+            currentFileName = filename;
+            if (!specificFilename) saveState(); // Save on manual change
+
+            document.getElementById('adjustmentsFile').innerText = `(${filename})`;
+            fetch('/api/config/' + filename + '?t=' + new Date().getTime())
+                .then(r => r.json())
+                .then(data => {
+                    currentConfig = data;
+                    refreshTeamList();
+
+                    // After refreshing team list, restore team/stance if pending
+                    if (window.restoreTeam) {
+                        const sel = document.getElementById('teamSelect');
+                        // verify exists
+                        if ([...sel.options].some(o => o.value === window.restoreTeam)) {
+                            sel.value = window.restoreTeam;
+                        }
+                        window.restoreTeam = null;
+
+                        // If we restored team, we might want to trigger opponent update if in sim mode with date set
+                        // but let's just let updateUI handle visual
+                    }
+
+                    if (window.restoreStance) {
+                        document.getElementById('stanceSelect').value = window.restoreStance;
+                        window.restoreStance = null;
+                    }
+
+                    updateUI();
+                })
+                .catch(err => console.error("Config load failed", err));
+        }
+
+
 
         function parseLayoutCoord(def, dimensionSize) {
             if (Array.isArray(def)) {
@@ -559,31 +713,277 @@
                 });
         }
 
+        let datePicker = null;
+
+        function toggleEmulatorMode() {
+            const mode = document.getElementById('emuMode').value;
+            const simPanel = document.getElementById('simOptions');
+            if (mode === 'simulator') {
+                simPanel.style.display = 'flex';
+
+                if (!datePicker) {
+                    datePicker = flatpickr("#simDate", {
+                        dateFormat: "Y-m-d",
+                        maxDate: new Date().fp_incr(-1),
+                        disable: [
+                            function (date) {
+                                // Disable all by default until loaded? 
+                                // Better: enable specific dates. If enable array is empty, all disabled?
+                                // If enable not set, all enabled.
+                                // We want to highlight played games.
+                                return false;
+                            }
+                        ],
+                        onChange: function (selectedDates, dateStr, instance) {
+                            simDateChanged();
+                        },
+                        onMonthChange: function (selectedDates, dateStr, instance) {
+                            fetchMonthSchedule(instance.currentYear, instance.currentMonth + 1);
+                        },
+                        onOpen: function (selectedDates, dateStr, instance) {
+                            // Fetch for current view if not loaded
+                            fetchMonthSchedule(instance.currentYear, instance.currentMonth + 1);
+                        }
+                    });
+
+                    // Initial fetch
+                    const now = new Date();
+                    fetchMonthSchedule(now.getFullYear(), now.getMonth() + 1);
+                }
+
+            } else {
+                simPanel.style.display = 'none';
+            }
+            saveState();
+        }
+
+        // Cache for schedule data to avoid spamming API
+        const scheduleCache = {};
+
+        function fetchMonthSchedule(year, month) {
+            const team = document.getElementById('teamSelect').value;
+            if (!team) return;
+
+            const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+            const cacheKey = `${team}_${monthStr}`;
+
+            if (scheduleCache[cacheKey]) {
+                updateDatePickerEnabled(scheduleCache[cacheKey]);
+                return;
+            }
+
+            console.log(`Fetching schedule for ${team} in ${monthStr}`);
+            fetch(`/api/schedule?team=${team}&month=${monthStr}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.dates) {
+                        scheduleCache[cacheKey] = data.dates;
+                        updateDatePickerEnabled(data.dates);
+                    }
+                })
+                .catch(e => console.error("Schedule fetch error", e));
+        }
+
+        function updateDatePickerEnabled(dates) {
+            if (!datePicker) return;
+
+            // Flatpickr 'enable' option takes an array of date strings or functions.
+            // We want to ENABLE only the dates in the list.
+            // But we also want to allow navigation.
+
+            // To "highlight" and allow selection only of game days:
+            datePicker.set('enable', dates);
+
+            // Force redraw
+            datePicker.redraw();
+        }
+
+        function simDateChanged() {
+            const dateStr = document.getElementById('simDate').value;
+            const team = document.getElementById('teamSelect').value;
+
+            if (dateStr && team) {
+                // Fetch opponent
+                fetch(`/api/opponent?team=${team}&date=${dateStr}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.opponent) {
+                            // Update Opponent for Visuals
+                            const sel2 = document.getElementById('team2Select');
+                            let found = false;
+                            for (let i = 0; i < sel2.options.length; i++) {
+                                if (sel2.options[i].value === data.opponent) {
+                                    sel2.selectedIndex = i;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) console.log("Opponent not found in list: " + data.opponent);
+
+                            // Auto-Switch Stance
+                            if (data.is_away) {
+                                document.getElementById('stanceSelect').value = 'away';
+                            } else {
+                                document.getElementById('stanceSelect').value = 'home';
+                            }
+
+                            updateUI();
+                        }
+                    });
+            }
+            saveState();
+        }
+
+        // --- Persistence Logic ---
+        function saveState() {
+            const state = {
+                size: document.getElementById('sizeSelect').value,
+                file: document.getElementById('fileSelect').value,
+                team: document.getElementById('teamSelect').value,
+                stance: document.getElementById('stanceSelect').value,
+
+                // Simulator stuff
+                emuMode: document.getElementById('emuMode').value,
+                simDate: document.getElementById('simDate').value,
+                simSpeed: document.getElementById('simSpeed').value,
+                simStop: document.getElementById('simStopAtEnd').checked
+            };
+            localStorage.setItem('nhl_editor_state', JSON.stringify(state));
+        }
+
+        function loadState(filesList) {
+            const saved = localStorage.getItem('nhl_editor_state');
+            if (!saved) return;
+
+            try {
+                const state = JSON.parse(saved);
+
+                // Matrix Size
+                if (state.size) {
+                    const sel = document.getElementById('sizeSelect');
+                    if ([...sel.options].some(o => o.value === state.size)) {
+                        sel.value = state.size;
+                        // Don't trigger loadMatrixSize here, it's called by checkEmulatorStatus or manual call
+                        // But we need to make sure global vars are set
+                    }
+                }
+
+                // File - logic in loadMatrixSize handles default selection, but we can override
+                if (state.file && filesList && filesList.includes(state.file)) {
+                    // We let loadMatrixSize flow handle this usually, but it picks default logos_W.json
+                    // We might want to override that inside loadMatrixSize callback or just set it
+                    // Actually simplest: let loadMatrixSize run, it sets default. Then we override if needed?
+                    // Or just set the select value and call loadConfig?
+                    // Since loadMatrixSize is complex, let's just let it run, it uses defaults. 
+                    // We can try to restore "file" after loadMatrixSize if we carefully chain it.
+                    // But simpler: just store it in a var and check it inside loadMatrixSize callbacks.
+                    window.restoreFile = state.file;
+                }
+
+                // Team & Stance - restore after config loads
+                if (state.team) window.restoreTeam = state.team;
+                if (state.stance) window.restoreStance = state.stance;
+
+                // Simulator options
+                if (state.emuMode) {
+                    const sel = document.getElementById('emuMode');
+                    sel.value = state.emuMode;
+                    toggleEmulatorMode();
+                }
+                if (state.simDate) document.getElementById('simDate').value = state.simDate;
+                if (state.simSpeed) document.getElementById('simSpeed').value = state.simSpeed;
+                if (state.simStop !== undefined) document.getElementById('simStopAtEnd').checked = state.simStop;
+
+            } catch (e) {
+                console.error("State restore error", e);
+            }
+        }
+
         function launchEmulator() {
             const status = document.getElementById('statusMsg');
             status.innerText = "Launching Emulator...";
             const loader = document.getElementById('emuLoader');
             const iframe = document.getElementById('emuFrame');
             const wrapper = document.getElementById('emuWrapper');
+            const mode = document.getElementById('emuMode').value;
+
             wrapper.classList.remove('collapsed');
+
+            // Only show loader/iframe if intended (simulator might just be backend logs initially?)
+            // But we assume simulator also renders to the same port, so we can view it.
             loader.style.display = 'flex';
             iframe.src = 'about:blank';
+
+            const payload = { w: matrixW, h: matrixH, mode: mode };
+
+            if (mode === 'simulator') {
+                payload.team = document.getElementById('teamSelect').value;
+                payload.date = document.getElementById('simDate').value;
+                payload.speed = document.getElementById('simSpeed').value;
+                payload.stop_at_end = document.getElementById('simStopAtEnd').checked;
+
+                if (!payload.date) {
+                    alert("Please select a date for simulation.");
+                    status.innerText = "Error: Missing Date";
+                    loader.style.display = 'none';
+                    return;
+                }
+            }
+
             fetch('/api/emulator/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ w: matrixW, h: matrixH })
+                body: JSON.stringify(payload)
             })
                 .then(r => r.json())
                 .then(res => {
                     if (res.status === 'success') {
-                        status.innerText = "Emulator Started!";
-                        status.style.color = "lightgreen";
-                        setTimeout(() => {
-                            iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
-                            iframe.onload = () => { loader.style.display = 'none'; };
-                            setTimeout(() => { loader.style.display = 'none'; }, 2000);
-                        }, 2000);
-                        checkEmulatorStatus();
+                        status.innerText = "Emulator Starting...";
+                        status.style.color = "yellow";
+
+                        // Poll for readiness
+                        let attempts = 0;
+                        const maxAttempts = 20; // 10 seconds (500ms * 20)
+
+                        const checkReady = () => {
+                            attempts++;
+                            // Check if process died
+                            fetch('/api/emulator/status').then(r => r.json()).then(pStatus => {
+                                if (!pStatus.running) {
+                                    // Process died
+                                    fetchLogAndAlert();
+                                    return;
+                                }
+
+                                fetch('/api/emulator/check_ready')
+                                    .then(r => r.json())
+                                    .then(data => {
+                                        if (data.ready) {
+                                            status.innerText = "Emulator Online!";
+                                            status.style.color = "lightgreen";
+                                            iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
+                                            iframe.onload = () => { loader.style.display = 'none'; };
+                                            setTimeout(() => { loader.style.display = 'none'; }, 1000);
+                                            checkEmulatorStatus();
+                                        } else {
+                                            if (attempts < maxAttempts) {
+                                                setTimeout(checkReady, 500);
+                                            } else {
+                                                status.innerText = "Error: Timeout waiting for emulator";
+                                                status.style.color = "red";
+                                                loader.style.display = 'none';
+                                                fetchLogAndAlert();
+                                            }
+                                        }
+                                    })
+                                    .catch(e => {
+                                        console.log("Readiness check error:", e);
+                                        if (attempts < maxAttempts) setTimeout(checkReady, 500);
+                                    });
+                            });
+                        };
+                        checkReady();
+
                     } else {
                         status.innerText = "Error: " + res.message;
                         status.style.color = "red";
@@ -591,6 +991,31 @@
                     }
                 });
         }
+
+        function fetchLogAndAlert() {
+            const loader = document.getElementById('emuLoader');
+            const status = document.getElementById('statusMsg');
+            loader.style.display = 'none';
+            status.innerText = "Launch Failed";
+            status.style.color = "red";
+
+            fetch('/api/emulator/log')
+                .then(r => r.json())
+                .then(data => {
+                    const log = data.log || "";
+                    if (log.includes("404") || log.includes("Could not find game")) {
+                        alert("Error: Game data not found (404).\n\nThe game might not have started yet, or no game exists for this date.");
+                    } else if (log.includes("429") || log.includes("Too Many Requests")) {
+                        alert("Error: API Throttling (429).\n\nPlease wait a moment before trying again.");
+                    } else {
+                        // Truncate log for alert
+                        const shortLog = log.length > 500 ? "..." + log.slice(-500) : log;
+                        alert("Emulator Failed to Start:\n\n" + shortLog);
+                    }
+                });
+        }
+
+
 
         function stopEmulator() {
             fetch('/api/emulator/stop', { method: 'POST' })
@@ -788,6 +1213,14 @@
         }
 
         function updateUI() {
+            saveState();
+
+            // Refresh simulator calendar if valid
+            if (window.datePicker && document.getElementById('emuMode').value === 'simulator') {
+                // Convert from 0-index to 1-index
+                fetchMonthSchedule(window.datePicker.currentYear, window.datePicker.currentMonth + 1);
+            }
+
             const team1Val = document.getElementById('teamSelect').value;
             const stance1 = document.getElementById('stanceSelect').value;
             const team2Val = document.getElementById('team2Select').value;

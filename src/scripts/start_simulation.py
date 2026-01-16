@@ -84,6 +84,7 @@ def run_simulation():
     parser.add_argument("--team", type=str, help="Team Abbreviation (e.g. WPG)")
     parser.add_argument("--speed", type=float, default=1.0, help="Simulation Speed Multiplier (e.g. 2.0)")
     parser.add_argument("--stop-at-end", action="store_true", help="Stop the simulator when the game is finished")
+    parser.add_argument("--date", type=str, help="Game Date (YYYY-MM-DD)")
     
     # Use parse_known_args to separate simulator args from scoreboard args
     args, remaining_argv = parser.parse_known_args()
@@ -124,13 +125,13 @@ def run_simulation():
     game_id = fetch_game_id(team, date_str)
     if not game_id:
         print("Could not find game. Exiting.")
-        return
+        sys.exit(1)
 
     # 2. Get Play-by-Play
     pbp_data = fetch_play_by_play(game_id)
     if not pbp_data:
         print("Could not fetch game data. Exiting.")
-        return
+        sys.exit(1)
 
     # 3. Initialize Simulator
     logger.info(f"Initializing simulator with speed x{args.speed}")

@@ -99,6 +99,96 @@ def index():
                            emulator_port=emulator_port, 
                            emulator_pixel_size=emulator_pixel_size)
 
+# --- HELPER FUNCTIONS ---
+
+def fetch_opponent_team(team_abbr, date_str):
+    try:
+        url = f"https://api-web.nhle.com/v1/club-schedule/{team_abbr}/week/{date_str}"
+        print(f"[Backend] Fetching schedule: {url}")
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+        
+        target_date = date_str
+        for game in data.get("games", []):
+            if game.get("gameDate") == target_date:
+                # Find opponent
+                if game["homeTeam"]["abbrev"] == team_abbr:
+                     # We are HOME, Opponent is AWAY
+                    return game["awayTeam"]["abbrev"], False
+                else:
+                    # We are AWAY, Opponent is HOME
+                    return game["homeTeam"]["abbrev"], True
+        return None
+    except Exception as e:
+        print(f"[Backend] Error fetching opponent: {e}")
+        return None
+
+@app.route('/api/opponent', methods=['GET'])
+def get_opponent():
+    team = request.args.get('team')
+    date_str = request.args.get('date')
+    if not team or not date_str:
+        return jsonify({"error": "Missing team or date"}), 400
+    
+    result = fetch_opponent_team(team, date_str)
+    if result:
+        opp_abbr, is_away = result
+        return jsonify({"opponent": opp_abbr, "is_away": is_away})
+    else:
+        return jsonify({"opponent": None}), 404
+
+def fetch_team_schedule(team_abbr, month_str):
+    try:
+        # month_str expected as YYYY-MM
+        url = f"https://api-web.nhle.com/v1/club-schedule/{team_abbr}/month/{month_str}"
+        print(f"[Backend] Fetching monthly schedule: {url}")
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+        
+        dates = []
+        for game in data.get("games", []):
+            dates.append(game.get("gameDate"))
+        return dates
+    except Exception as e:
+        print(f"[Backend] Error fetching schedule: {e}")
+        return []
+
+@app.route('/api/schedule', methods=['GET'])
+def get_schedule():
+    team = request.args.get('team')
+    month = request.args.get('month') # YYYY-MM
+    if not team or not month:
+        return jsonify({"error": "Missing team or month"}), 400
+    
+    dates = fetch_team_schedule(team, month)
+    return jsonify({"dates": dates})
+
+
+@app.route('/api/emulator/check_ready', methods=['GET'])
+def emulator_check_ready():
+    # Read port from config or default
+    port = 8888
+    if os.path.exists(EMULATOR_CONFIG_PATH):
+        try:
+            with open(EMULATOR_CONFIG_PATH, 'r') as f:
+                data = json.load(f)
+                port = data.get('browser', {}).get('port', 8888)
+        except:
+            pass
+            
+    # Check if port is open
+    import socket
+    try:
+        with socket.create_connection(("localhost", port), timeout=1):
+            return jsonify({"ready": True})
+    except (socket.timeout, ConnectionRefusedError):
+        return jsonify({"ready": False})
+    except Exception as e:
+        print(f"Error checking port: {e}")
+        return jsonify({"ready": False})
+
 # --- EMULATOR CONTROL API ---
 
 @app.route('/api/emulator/status', methods=['GET'])
@@ -115,6 +205,17 @@ def emulator_status():
         "w": current_layout["w"],
         "h": current_layout["h"]
     })
+
+@app.route('/api/emulator/log', methods=['GET'])
+def emulator_log():
+    try:
+        if os.path.exists("emulator.log"):
+            with open("emulator.log", "r") as f:
+                content = f.read()
+            return jsonify({"log": content})
+        return jsonify({"log": "No log file found."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/emulator/start', methods=['POST'])
 def emulator_start():
@@ -135,22 +236,65 @@ def emulator_start():
     data = request.json
     cols = data.get('w', 64)
     rows = data.get('h', 32)
+    mode = data.get('mode', 'live')
     current_layout = {"w": cols, "h": rows}
     
+    cmd_parts = []
+    
     if USE_CURRENT_ENV:
-        cmd_str = f"cd {INSTALL_DIR} && {sys.executable} src/main.py --led-cols={cols} --led-rows={rows} --emulated"
+        cmd_parts.append(f"cd {INSTALL_DIR}")
+        executable = sys.executable
     else:
-        cmd_str = f"source {VENV_ACTIVATE_SCRIPT} && cd {INSTALL_DIR} && python3 src/main.py --led-cols={cols} --led-rows={rows} --emulated"
+        cmd_parts.append(f"source {VENV_ACTIVATE_SCRIPT}")
+        cmd_parts.append(f"cd {INSTALL_DIR}")
+        executable = "python3"
+
+    if mode == 'simulator':
+        team = data.get('team')
+        date_str = data.get('date')
+        speed = data.get('speed', 1.0)
+        stop_at_end = data.get('stop_at_end', False)
+        
+        script_args = f"src/scripts/start_simulation.py --team {team} --date {date_str} --speed {speed}"
+        if stop_at_end:
+            script_args += " --stop-at-end"
+            
+        # Add scoreboard args (still needed for main.py invoked by start_simulation?)
+        # Actually start_simulation invokes main.py internally.
+        # But we need to pass cols/rows to main.py? 
+        # start_simulation.py calls generic 'main.run()', which parses args.
+        # So we should pass the scoreboard args to start_simulation.py too so it can pass them along?
+        # Looking at start_simulation.py: it parses known args, then sets sys.argv for main.
+        # So we append scoreboard args to the command line.
+        script_args += f" --led-cols={cols} --led-rows={rows} --emulated"
+        
+        if USE_CURRENT_ENV:
+             cmd_parts.append(f"{executable} {script_args}")
+        else:
+             cmd_parts.append(f"{executable} {script_args}")
+             
+    else:
+        # LIVE MODE
+        if USE_CURRENT_ENV:
+            cmd_parts.append(f"{executable} src/main.py --led-cols={cols} --led-rows={rows} --emulated")
+        else:
+            cmd_parts.append(f"{executable} src/main.py --led-cols={cols} --led-rows={rows} --emulated")
+            
+    cmd_str = " && ".join(cmd_parts)
+    
+    print(f"[Emulator] Launching: {cmd_str}")
     
     print(f"[Emulator] Launching: {cmd_str}")
     
     try:
+        # Open log file
+        log_file = open("emulator.log", "w")
         emulator_process = subprocess.Popen(
             cmd_str, 
             shell=True, 
             executable='/bin/bash', 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL,
+            stdout=log_file, 
+            stderr=subprocess.STDOUT, # Merge stderr into stdout
             preexec_fn=os.setsid 
         )
         return jsonify({"status": "success", "pid": emulator_process.pid})
