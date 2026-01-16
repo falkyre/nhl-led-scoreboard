@@ -464,26 +464,39 @@ def cmd_workers(args):
 
             # Show additional details for specific workers
             value = info["value"]
-            if cache_key == "nhl_games_today" and isinstance(value, dict):
-                games = value.get("raw", [])
-                fetched = value.get("fetched_at")
-                print(f"│  Games: {len(games)}")
-                if fetched:
-                    age = datetime.now() - fetched
+
+            # Unwrap CacheEntry if present
+            actual_data = value
+            fetched_at = None
+            if hasattr(value, 'data') and hasattr(value, 'fetched_at'):
+                # It's a CacheEntry
+                actual_data = value.data
+                fetched_at = value.fetched_at
+                if fetched_at:
+                    age = datetime.now() - fetched_at
                     print(f"│  Fetched: {format_timedelta(age)} ago")
 
-            elif cache_key == "nhl_standings" and hasattr(value, "eastern"):
+            if cache_key == "nhl_games_today":
+                # GamesData has raw and structured
+                if hasattr(actual_data, 'raw'):
+                    print(f"│  Games: {len(actual_data.raw)}")
+                elif isinstance(actual_data, dict):
+                    games = actual_data.get("raw", [])
+                    print(f"│  Games: {len(games)}")
+
+            elif cache_key == "nhl_standings":
                 # Standings has eastern and western Conference objects
-                east_teams = len(value.eastern.teams) if hasattr(value.eastern, 'teams') else 0
-                west_teams = len(value.western.teams) if hasattr(value.western, 'teams') else 0
-                print(f"│  Teams: {east_teams + west_teams} (East: {east_teams}, West: {west_teams})")
+                if hasattr(actual_data, "eastern"):
+                    east_teams = len(actual_data.eastern.teams) if hasattr(actual_data.eastern, 'teams') else 0
+                    west_teams = len(actual_data.western.teams) if hasattr(actual_data.western, 'teams') else 0
+                    print(f"│  Teams: {east_teams + west_teams} (East: {east_teams}, West: {west_teams})")
 
-            elif cache_key == "nhl_stats_leaders" and isinstance(value, dict):
-                print(f"│  Categories: {list(value.keys())}")
+            elif cache_key == "nhl_stats_leaders" and isinstance(actual_data, dict):
+                print(f"│  Categories: {list(actual_data.keys())}")
 
-            elif cache_key == "team_schedule_data" and isinstance(value, dict):
-                print(f"│  Teams: {len(value)}")
-                for team_id, team_data in value.items():
+            elif cache_key == "team_schedule_data" and isinstance(actual_data, dict):
+                print(f"│  Teams: {len(actual_data)}")
+                for team_id, team_data in actual_data.items():
                     if hasattr(team_data, 'team_abbrev'):
                         print(f"│    └─ {team_data.team_abbrev}")
         else:

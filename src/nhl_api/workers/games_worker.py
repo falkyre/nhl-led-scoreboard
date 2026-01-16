@@ -1,18 +1,28 @@
 """
 Games Worker - Background data fetching and caching for NHL games.
 """
+
 import logging
-from datetime import date, datetime, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Dict, List, Optional
 
 from nhl_api.data import get_games, get_score_details
-from nhl_api.models import Game, GameState
-from utils import sb_cache
+from nhl_api.models import Game
+from nhl_api.workers.base_worker import BaseWorker
 
 debug = logging.getLogger("scoreboard")
 
 
-class GamesWorker:
+@dataclass
+class GamesData:
+    """Wrapper for games data supporting both raw and structured formats."""
+    raw: List[Dict]
+    structured: List[Game]
+    date: date
+
+
+class GamesWorker(BaseWorker[GamesData]):
     """
     Background worker that fetches and caches daily NHL games data.
 
@@ -29,6 +39,7 @@ class GamesWorker:
 
     JOB_ID = "gamesWorker"
     CACHE_KEY = "nhl_games_today"
+    DEFAULT_TTL_BUFFER = 10
 
     def __init__(self, data, scheduler, refresh_seconds: int = 60):
         """
@@ -39,69 +50,40 @@ class GamesWorker:
             scheduler: APScheduler instance
             refresh_seconds: Base refresh interval for ticker display (default: 60 seconds)
         """
-        self.data = data
-        self.scheduler = scheduler
         self.base_refresh_seconds = refresh_seconds
-        self.current_refresh_seconds = refresh_seconds
-
-        # Register with scheduler - will be rescheduled dynamically
-        scheduler.add_job(
-            self.fetch_and_cache,
-            'interval',
-            seconds=self.current_refresh_seconds,
-            jitter=3,  # Add small jitter to avoid exact timing collisions
-            id=self.JOB_ID
+        super().__init__(
+            data=data,
+            scheduler=scheduler,
+            refresh_seconds=refresh_seconds,
+            jitter=3,
+            ttl_buffer=10
         )
 
-        debug.info(f"GamesWorker: Initialized with adaptive refresh (base: {self.base_refresh_seconds}s)")
+    def fetch_data(self) -> Optional[GamesData]:
+        """Fetch today's games in both raw and structured formats."""
+        date_obj = date.today()
 
-        # Fetch immediately on startup
-        self.fetch_and_cache()
+        # Fetch raw data for backward compatibility with GameSummaryBoard
+        raw_data = get_score_details(date_obj)
 
-    def fetch_and_cache(self):
-        """
-        Fetch today's games from API and cache in both raw and structured formats.
+        # Fetch structured Game objects for new code
+        games = get_games(date_obj)
 
-        Caches both formats for backward compatibility and future migration:
-        - raw: Original dict format for GameSummaryBoard
-        - structured: Game dataclass objects for new code
+        if raw_data:
+            return GamesData(
+                raw=raw_data.get('games', []),
+                structured=games,
+                date=date_obj
+            )
+        return None
 
-        After caching, adjusts refresh interval based on game states.
-        """
-        try:
-            # Get today's date
-            date_obj = date.today()
+    def _on_fetch_success(self, data: GamesData):
+        """Adjust refresh interval based on game states."""
+        self._adjust_refresh_interval(data.structured)
 
-            # Fetch raw data for backward compatibility with GameSummaryBoard
-            raw_data = get_score_details(date_obj)
-
-            # Fetch structured Game objects for new code
-            games = get_games(date_obj)
-
-            if raw_data:
-                # Cache both formats
-                cache_data = {
-                    'raw': raw_data.get('games', []),
-                    'structured': games,
-                    'fetched_at': datetime.now(),
-                    'date': date_obj
-                }
-
-                # Cache with TTL slightly longer than refresh interval
-                expire_seconds = self.current_refresh_seconds + 10
-                sb_cache.set(self.CACHE_KEY, cache_data, expire=expire_seconds)
-
-                debug.info(f"GamesWorker: Successfully cached {len(games)} games for {date_obj}")
-
-                # Adjust refresh interval based on game states
-                self._adjust_refresh_interval(games)
-            else:
-                debug.warning("GamesWorker: No games data received from API")
-                # No games - use long refresh interval
-                self._update_refresh_interval(1800)  # 30 minutes
-
-        except Exception as e:
-            debug.error(f"GamesWorker: Failed to fetch games: {e}")
+    def _on_fetch_empty(self):
+        """No games - use long refresh."""
+        self._update_refresh_interval(1800)  # 30 minutes
 
     def _adjust_refresh_interval(self, games: List[Game]):
         """
@@ -123,14 +105,11 @@ class GamesWorker:
         # Get current time - use UTC if game times are timezone-aware, otherwise local time
         first_game_tz = games[0].game_date.tzinfo
         if first_game_tz is not None:
-            # Game times are timezone-aware, use UTC for comparison
-            from datetime import timezone
             now = datetime.now(timezone.utc)
-            debug.debug(f"GamesWorker: Using UTC time. Now: {now.strftime('%Y-%m-%d %H:%M:%S %Z')}, First game: {games[0].game_date.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            debug.debug(f"GamesWorker: Using UTC time. Now: {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         else:
-            # Game times are naive, use local time
             now = datetime.now()
-            debug.debug(f"GamesWorker: Using local time. Now: {now.strftime('%Y-%m-%d %H:%M:%S')}, First game: {games[0].game_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            debug.debug(f"GamesWorker: Using local time. Now: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Check if any games are live or final
         has_live = any(g.is_live for g in games)
@@ -175,37 +154,7 @@ class GamesWorker:
         debug.debug("GamesWorker: Using default 15-minute refresh")
         self._update_refresh_interval(new_interval)
 
-    def _update_refresh_interval(self, new_interval: int):
-        """
-        Update the refresh interval if it has changed.
-
-        Args:
-            new_interval: New interval in seconds
-        """
-        if new_interval != self.current_refresh_seconds:
-            self.current_refresh_seconds = new_interval
-
-            try:
-                # Reschedule the job with new interval
-                self.scheduler.reschedule_job(
-                    self.JOB_ID,
-                    trigger='interval',
-                    seconds=new_interval,
-                    jitter=3
-                )
-                debug.info(f"GamesWorker: Adjusted refresh interval to {new_interval}s")
-            except Exception as e:
-                debug.error(f"GamesWorker: Failed to reschedule job: {e}")
-
-    @staticmethod
-    def get_cached_data() -> Optional[Dict]:
-        """
-        Retrieve cached games data.
-
-        Returns:
-            Dict containing raw and structured game data, or None if not cached
-        """
-        return sb_cache.get(GamesWorker.CACHE_KEY)
+    # Backward-compatible static methods
 
     @staticmethod
     def get_games_raw() -> List[Dict]:
@@ -219,7 +168,7 @@ class GamesWorker:
             List of game dictionaries, or empty list if not cached
         """
         data = GamesWorker.get_cached_data()
-        return data['raw'] if data else []
+        return data.raw if data else []
 
     @staticmethod
     def get_games_structured() -> List[Game]:
@@ -233,14 +182,4 @@ class GamesWorker:
             List of Game objects, or empty list if not cached
         """
         data = GamesWorker.get_cached_data()
-        return data['structured'] if data else []
-
-    @staticmethod
-    def is_cached() -> bool:
-        """
-        Check if games data is currently cached.
-
-        Returns:
-            True if cached data exists, False otherwise
-        """
-        return GamesWorker.get_cached_data() is not None
+        return data.structured if data else []

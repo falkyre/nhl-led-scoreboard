@@ -1,17 +1,17 @@
 """
 Live Game Worker - Background data fetching for the currently displayed live game.
 """
+
 import logging
-from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from nhl_api.data import get_game_overview
-from utils import sb_cache
+from nhl_api.workers.base_worker import LifecycleWorker
 
 debug = logging.getLogger("scoreboard")
 
 
-class LiveGameWorker:
+class LiveGameWorker(LifecycleWorker[Dict]):
     """
     Background worker that fetches detailed game overview data for the live game
     currently being displayed on the main screen.
@@ -33,117 +33,23 @@ class LiveGameWorker:
 
     JOB_ID = "liveGameWorker"
     CACHE_KEY_PREFIX = "live_game_overview"
+    DEFAULT_TTL_BUFFER = 5
 
-    def __init__(self, data, scheduler):
+    def fetch_data(self, game_id: int) -> Optional[Dict]:
         """
-        Initialize the live game worker (does not start fetching).
+        Fetch game overview from NHL API.
 
         Args:
-            data: Application data object
-            scheduler: APScheduler instance
+            game_id: NHL game ID to fetch
+
+        Returns:
+            Game overview dict, or None if fetch failed
         """
-        self.data = data
-        self.scheduler = scheduler
-        self.current_game_id = None
-        self.is_monitoring = False
-        self.current_refresh_seconds = 5
+        return get_game_overview(game_id)
 
-        debug.info("LiveGameWorker: Initialized (not monitoring)")
-
-    def start_monitoring(self, game_id: int, refresh_seconds: int = 5):
-        """
-        Start monitoring a specific game with real-time updates.
-
-        If already monitoring a different game, stops that and starts the new one.
-
-        Args:
-            game_id: NHL game ID to monitor
-            refresh_seconds: Base refresh interval (default: 5 seconds for live play)
-        """
-        # If already monitoring this game, don't restart
-        if self.is_monitoring and self.current_game_id == game_id:
-            debug.debug(f"LiveGameWorker: Already monitoring game {game_id}")
-            return
-
-        # If monitoring a different game, stop first
-        if self.is_monitoring:
-            debug.info(f"LiveGameWorker: Switching from game {self.current_game_id} to {game_id}")
-            self.stop_monitoring()
-
-        self.current_game_id = game_id
-        self.current_refresh_seconds = refresh_seconds
-        self.is_monitoring = True
-
-        # Add job to scheduler
-        try:
-            self.scheduler.add_job(
-                self.fetch_and_cache,
-                'interval',
-                seconds=self.current_refresh_seconds,
-                jitter=1,  # Small jitter for live updates
-                id=self.JOB_ID
-            )
-            debug.info(f"LiveGameWorker: Started monitoring game {game_id} ({refresh_seconds}s refresh)")
-
-            # Fetch immediately
-            self.fetch_and_cache()
-        except Exception as e:
-            debug.error(f"LiveGameWorker: Failed to start monitoring: {e}")
-            self.is_monitoring = False
-
-    def stop_monitoring(self):
-        """
-        Stop monitoring the current game and remove from scheduler.
-        """
-        if not self.is_monitoring:
-            debug.debug("LiveGameWorker: Not monitoring, nothing to stop")
-            return
-
-        try:
-            self.scheduler.remove_job(self.JOB_ID)
-            debug.info(f"LiveGameWorker: Stopped monitoring game {self.current_game_id}")
-        except Exception as e:
-            debug.warning(f"LiveGameWorker: Error removing job (may not exist): {e}")
-
-        self.is_monitoring = False
-        self.current_game_id = None
-
-    def fetch_and_cache(self):
-        """
-        Fetch game overview from API and cache it.
-
-        Caches the overview data for the renderer to consume with a short TTL
-        since we're fetching frequently.
-        """
-        if not self.is_monitoring or not self.current_game_id:
-            debug.warning("LiveGameWorker: fetch_and_cache called but not monitoring")
-            return
-
-        try:
-            # Fetch detailed game overview
-            overview = get_game_overview(self.current_game_id)
-
-            if overview:
-                # Cache with short TTL (slightly longer than refresh interval)
-                cache_data = {
-                    'overview': overview,
-                    'game_id': self.current_game_id,
-                    'fetched_at': datetime.now()
-                }
-
-                cache_key = f"{self.CACHE_KEY_PREFIX}_{self.current_game_id}"
-                expire_seconds = self.current_refresh_seconds + 5
-                sb_cache.set(cache_key, cache_data, expire=expire_seconds)
-
-                debug.debug(f"LiveGameWorker: Cached overview for game {self.current_game_id}")
-
-                # Check if we should adjust refresh rate based on game state
-                self._adjust_refresh_interval(overview)
-            else:
-                debug.warning(f"LiveGameWorker: No overview data for game {self.current_game_id}")
-
-        except Exception as e:
-            debug.error(f"LiveGameWorker: Failed to fetch game {self.current_game_id}: {e}")
+    def _on_fetch_success(self, overview: Dict):
+        """Adjust refresh based on game state."""
+        self._adjust_refresh_interval(overview)
 
     def _adjust_refresh_interval(self, overview: Dict):
         """
@@ -160,13 +66,13 @@ class LiveGameWorker:
             # Determine appropriate refresh interval
             if game_state in ['FINAL', 'OFF']:
                 # Game is over - stop monitoring
-                debug.info(f"LiveGameWorker: Game {self.current_game_id} is {game_state}, stopping")
+                debug.info(f"LiveGameWorker: Game {self.current_resource_id} is {game_state}, stopping")
                 self.stop_monitoring()
                 return
             elif is_intermission:
                 # Intermission - slower refresh
                 new_interval = 30
-                debug.debug(f"LiveGameWorker: Intermission detected, using 30-second refresh")
+                debug.debug("LiveGameWorker: Intermission detected, using 30-second refresh")
             elif game_state in ['LIVE', 'CRIT']:
                 # Active play - fast refresh (CRIT = critical period, close game near end)
                 new_interval = 5
@@ -182,28 +88,22 @@ class LiveGameWorker:
 
             # Update interval if changed
             if new_interval != self.current_refresh_seconds:
-                self.current_refresh_seconds = new_interval
-
-                try:
-                    self.scheduler.reschedule_job(
-                        self.JOB_ID,
-                        trigger='interval',
-                        seconds=new_interval,
-                        jitter=1
-                    )
-                    # Show intermission status in log for clarity
-                    state_display = f"{game_state} (Intermission)" if is_intermission else game_state
-                    debug.info(f"LiveGameWorker: Adjusted refresh to {new_interval}s (state: {state_display})")
-                except Exception as e:
-                    debug.error(f"LiveGameWorker: Failed to reschedule: {e}")
+                self._update_refresh_interval(new_interval)
+                # Show intermission status in log for clarity
+                state_display = f"{game_state} (Intermission)" if is_intermission else game_state
+                debug.info(f"LiveGameWorker: Adjusted refresh to {new_interval}s (state: {state_display})")
 
         except Exception as e:
             debug.error(f"LiveGameWorker: Error adjusting interval: {e}")
 
-    @staticmethod
-    def get_cached_overview(game_id: int) -> Optional[Dict]:
+    # Convenience method for backward compatibility
+
+    @classmethod
+    def get_cached_overview(cls, game_id: int) -> Optional[Dict]:
         """
         Retrieve cached game overview for a specific game.
+
+        This is an alias for get_cached_data for backward compatibility.
 
         Args:
             game_id: NHL game ID
@@ -211,22 +111,4 @@ class LiveGameWorker:
         Returns:
             Game overview dict, or None if not cached
         """
-        cache_key = f"{LiveGameWorker.CACHE_KEY_PREFIX}_{game_id}"
-        cached = sb_cache.get(cache_key)
-
-        if cached:
-            return cached.get('overview')
-        return None
-
-    @staticmethod
-    def is_cached(game_id: int) -> bool:
-        """
-        Check if game overview is currently cached.
-
-        Args:
-            game_id: NHL game ID
-
-        Returns:
-            True if cached, False otherwise
-        """
-        return LiveGameWorker.get_cached_overview(game_id) is not None
+        return cls.get_cached_data(game_id)
