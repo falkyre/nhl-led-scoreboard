@@ -317,25 +317,28 @@ class Data:
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                date_obj = date(self.year, self.month, self.day)
-                data = get_score_details(date_obj)
+                # Try to use cached data from GamesWorker first (if available)
+                from nhl_api.workers import GamesWorker
+                cached_data = GamesWorker.get_cached_data()
+
+                if cached_data and cached_data.date == date(self.year, self.month, self.day):
+                    # Use cached data - much faster and reduces API calls
+                    debug.debug("refresh_games: Using cached data from GamesWorker")
+                    data = {'games': cached_data.raw}
+                else:
+                    # Fall back to fetching fresh data if cache miss or different day
+                    debug.debug("refresh_games: Cache miss, fetching fresh data")
+                    date_obj = date(self.year, self.month, self.day)
+                    data = get_score_details(date_obj)
+
                 if not data:
                     self.games = []
                     self.pref_games = []
                     return data
 
-
                 self.games = data["games"]
 
                 self.pref_games = filter_list_of_games(self.games, self.pref_teams)
-
-                # Populate the TeamInfo classes used for the team_summary board
-                for team_id in self.pref_teams:
-                    #import pdb; pdb.set_trace()
-                    team_info = self.teams_info[team_id].details
-                    pg, ng = nhl_info.team_previous_game(team_info.abbrev, str(date.today()))
-                    team_info.previous_game = pg
-                    team_info.next_game = ng
 
                 if self.config.preferred_teams_only and self.pref_teams:
                     self.games = self.pref_games
@@ -469,8 +472,29 @@ class Data:
 
     def refresh_overview(self):
         """
-            Get all the data of the main event.
+        Get all the data of the main event.
+
+        Uses cache-first approach: tries LiveGameWorker cache first,
+        falls back to direct API call if cache miss.
         """
+        # Try to use cached data from LiveGameWorker first
+        from nhl_api.workers import LiveGameWorker
+        cached_overview = LiveGameWorker.get_cached_overview(self.current_game_id)
+
+        if cached_overview:
+            debug.debug(f"refresh_overview: Using cached data from LiveGameWorker for game {self.current_game_id}")
+            self.overview = cached_overview
+
+            # Update timestamp tracking
+            if self.time_stamp != self.overview["clock"]["timeRemaining"]:
+                self.time_stamp = self.overview["clock"]["timeRemaining"]
+                self.new_data = True
+            self.needs_refresh = False
+            self.network_issues = False
+            return
+
+        # Cache miss - fetch from API as fallback
+        debug.debug(f"refresh_overview: Cache miss, fetching from API for game {self.current_game_id}")
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
@@ -660,7 +684,9 @@ class Data:
         return len(self.games) == 0
 
     def refresh_data(self):
-
+        """
+        Refresh game data for today.
+        """
         debug.info("refreshing data")
         # Flag to determine when to refresh data
         self.needs_refresh = True

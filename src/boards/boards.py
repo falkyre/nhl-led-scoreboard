@@ -21,10 +21,8 @@ from boards.clock import Clock
 from boards.ovi_tracker import OviTrackerRenderer
 from boards.pbdisplay import pbDisplay
 from boards.player_stats import PlayerStatsRenderer
-from boards.scoreticker import Scoreticker
 from boards.screensaver import screenSaver
 from boards.seriesticker import Seriesticker
-from boards.team_summary import TeamSummary
 from boards.wxAlert import wxAlert
 from boards.wxForecast import wxForecast
 from boards.wxWeather import wxWeather
@@ -69,9 +67,7 @@ class Boards:
         the unified render_board() method.
         """
         legacy_boards = {
-            "scoreticker": Scoreticker,
             "seriesticker": Seriesticker,
-            "team_summary": TeamSummary,
             "clock": Clock,
             "pbdisplay": pbDisplay,
             "weather": wxWeather,
@@ -713,10 +709,6 @@ class Boards:
     def fallback(self, data, matrix, sleepEvent):
         Clock(data, matrix, sleepEvent)
 
-    def scoreticker(self, data, matrix, sleepEvent):
-        board = self._get_cached_board_instance("scoreticker", Scoreticker, data, matrix, sleepEvent)
-        board.render()
-
     # Since 2024, the playoff features are removed as we have not colected the new API endpoint for them.
     def seriesticker(self, data, matrix, sleepEvent):
         board = self._get_cached_board_instance("seriesticker", Seriesticker, data, matrix, sleepEvent)
@@ -728,10 +720,6 @@ class Boards:
         pass
         # StanleyCupChampions(data, matrix, sleepEvent).render()
 
-
-    def team_summary(self, data, matrix, sleepEvent):
-        board = self._get_cached_board_instance("team_summary", TeamSummary, data, matrix, sleepEvent)
-        board.render()
 
     def clock(self, data, matrix, sleepEvent):
         board = self._get_cached_board_instance("clock", Clock, data, matrix, sleepEvent)

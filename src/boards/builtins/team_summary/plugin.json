@@ -1,0 +1,17 @@
+{
+  "name": "Team Summary",
+  "description": "Display favorite team summary including record, last game, and next game",
+  "version": "1.0.0",
+  "author": "NHL LED Scoreboard",
+  "enabled": true,
+  "requirements": {
+    "app_version": ">=2025.01.00"
+  },
+  "boards": [
+    {
+      "id": "team_summary",
+      "class_name": "TeamSummaryBoard",
+      "module": "team_summary"
+    }
+  ]
+}

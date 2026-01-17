@@ -120,154 +120,166 @@ class MainRenderer:
 
     def __render_game_day(self):
         debug.info("Showing Game")
-        # Initialize the scoreboard. get the current status at startup
-        self.data.refresh_overview()
-        self.scoreboard = Scoreboard(self.data.overview, self.data)
-        self.away_score = self.scoreboard.away_team.goals
-        self.home_score = self.scoreboard.home_team.goals
-        self.away_penalties = self.scoreboard.away_team.penalties
-        self.home_penalties = self.scoreboard.home_team.penalties
-        # Cache to save goals and penalties and allow all the details to be collected on the API.
-        self.goal_team_cache = []
-        self.penalties_team_cache = []
-        self.sleepEvent.clear()
 
-        while not self.sleepEvent.is_set():
+        # Start LiveGameWorker for background fetching of game overview
+        debug.info(f"Starting LiveGameWorker for game {self.data.current_game_id}")
+        self.data.live_game_worker.start_monitoring(self.data.current_game_id)
 
-            if self.data._is_new_day():
-                debug.debug('This is a new day')
-                return
+        try:
+            # Initialize the scoreboard. get the current status at startup
+            self.data.refresh_overview()
+            self.scoreboard = Scoreboard(self.data.overview, self.data)
+            self.away_score = self.scoreboard.away_team.goals
+            self.home_score = self.scoreboard.home_team.goals
+            self.away_penalties = self.scoreboard.away_team.penalties
+            self.home_penalties = self.scoreboard.home_team.penalties
+            # Cache to save goals and penalties and allow all the details to be collected on the API.
+            self.goal_team_cache = []
+            self.penalties_team_cache = []
+            self.sleepEvent.clear()
 
-            # Display the pushbutton board
-            if self.data.pb_trigger:
-                debug.info('PushButton triggered in game day loop....will display ' + self.data.config.pushbutton_state_triggered1 + ' board')
-                if not self.data.screensaver:
-                    self.data.pb_trigger = False
-                #Display the board from the config
-                self.boards._pb_board(self.data, self.matrix, self.sleepEvent)
+            while not self.sleepEvent.is_set():
 
-            # Display the Weather Alert board
-            if self.data.wx_alert_interrupt:
-                debug.info('Weather Alert triggered in game day loop....will display weather alert board')
-                self.data.wx_alert_interrupt = False
-                #Display the board from the config
-                self.boards._wx_alert(self.data, self.matrix, self.sleepEvent)
+                if self.data._is_new_day():
+                    debug.debug('This is a new day')
+                    return
 
-            # Display the screensaver board
-            if self.data.screensaver:
-                if not self.data.pb_trigger:
-                    debug.info('Screensaver triggered in game day loop....')
-                    #self.data.wx_alert_interrupt = False
+                # Display the pushbutton board
+                if self.data.pb_trigger:
+                    debug.info('PushButton triggered in game day loop....will display ' + self.data.config.pushbutton_state_triggered1 + ' board')
+                    if not self.data.screensaver:
+                        self.data.pb_trigger = False
                     #Display the board from the config
-                    self.boards._screensaver(self.data, self.matrix, self.sleepEvent)
-                else:
-                    self.data.pb_trigger = False
+                    self.boards._pb_board(self.data, self.matrix, self.sleepEvent)
 
-            if self.scoreboard.is_live:
-                """ Live Game state """
-                #blocks the screensaver from running if game is live
-                self.data.screensaver_livegame = True
-                # Used for the live state payload
-                period = self.scoreboard.periods.ordinal
-                clock = self.scoreboard.periods.clock
-                score = '{}-{}'.format(self.scoreboard.away_team.goals, self.scoreboard.home_team.goals)
+                # Display the Weather Alert board
+                if self.data.wx_alert_interrupt:
+                    debug.info('Weather Alert triggered in game day loop....will display weather alert board')
+                    self.data.wx_alert_interrupt = False
+                    #Display the board from the config
+                    self.boards._wx_alert(self.data, self.matrix, self.sleepEvent)
 
-                debug.info("Game is Live")
-                if self.data.config.mqtt_enabled:
-                    # Add game state onto queue
-                    qPayload = "intermission" if self.scoreboard.intermission else "live"
-                    qItem = ["{0}/state".format(self.data.config.mqtt_main_topic), qPayload]
-                    self.sbQueue.put_nowait(qItem)
-                    # Add game state onto queue
-                    qPayload = {"period": period, "clock": clock,"score": score}
-                    qItem = ["{0}/live/status".format(self.data.config.mqtt_main_topic),qPayload]
-                    self.sbQueue.put_nowait(qItem)
+                # Display the screensaver board
+                if self.data.screensaver:
+                    if not self.data.pb_trigger:
+                        debug.info('Screensaver triggered in game day loop....')
+                        #self.data.wx_alert_interrupt = False
+                        #Display the board from the config
+                        self.boards._screensaver(self.data, self.matrix, self.sleepEvent)
+                    else:
+                        self.data.pb_trigger = False
 
-                sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
+                if self.scoreboard.is_live:
+                    """ Live Game state """
+                    #blocks the screensaver from running if game is live
+                    self.data.screensaver_livegame = True
+                    # Used for the live state payload
+                    period = self.scoreboard.periods.ordinal
+                    clock = self.scoreboard.periods.clock
+                    score = '{}-{}'.format(self.scoreboard.away_team.goals, self.scoreboard.home_team.goals)
 
-                self.check_new_penalty()
-                self.check_new_goals()
-                self.__render_live(sbrenderer)
-                if self.scoreboard.intermission:
-                    debug.info("Main event is in Intermission")
+                    debug.info("Game is Live")
+                    if self.data.config.mqtt_enabled:
+                        # Add game state onto queue
+                        qPayload = "intermission" if self.scoreboard.intermission else "live"
+                        qItem = ["{0}/state".format(self.data.config.mqtt_main_topic), qPayload]
+                        self.sbQueue.put_nowait(qItem)
+                        # Add game state onto queue
+                        qPayload = {"period": period, "clock": clock,"score": score}
+                        qItem = ["{0}/live/status".format(self.data.config.mqtt_main_topic),qPayload]
+                        self.sbQueue.put_nowait(qItem)
 
-                    # Show Boards for Intermission
-                    self.draw_end_period_indicator()
-                    self.sleepEvent.wait(self.refresh_rate)
+                    sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
 
                     self.check_new_penalty()
                     self.check_new_goals()
-                    self.boards._intermission(self.data, self.matrix,self.sleepEvent)
-                else:
+                    self.__render_live(sbrenderer)
+                    if self.scoreboard.intermission:
+                        debug.info("Main event is in Intermission")
+
+                        # Show Boards for Intermission
+                        self.draw_end_period_indicator()
+                        self.sleepEvent.wait(self.refresh_rate)
+
+                        self.check_new_penalty()
+                        self.check_new_goals()
+                        self.boards._intermission(self.data, self.matrix,self.sleepEvent)
+                    else:
+                        self.sleepEvent.wait(self.refresh_rate)
+
+                elif self.scoreboard.is_game_over:
+                    debug.info("Game Over")
+                    if self.data.config.mqtt_enabled:
+                        # Add game state onto queue
+                        qPayload = "gameover"
+                        qItem = ["{0}/state".format(self.data.config.mqtt_main_topic),qPayload]
+                        self.sbQueue.put_nowait(qItem)
+
+                    sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
+                    self.check_new_goals()
+                    """ if self.data.isPlayoff and self.data.stanleycup_round:
+                        self.data.check_stanley_cup_champion()
+                        if self.data.cup_winner_id:
+                            StanleyCupChampions(self.data, self.matrix, self.sleepEvent).render() """
+
+                    self.__render_postgame(sbrenderer)
                     self.sleepEvent.wait(self.refresh_rate)
+                    if not self.goal_team_cache:
+                        self.boards._post_game(self.data, self.matrix,self.sleepEvent)
 
-            elif self.scoreboard.is_game_over:
-                debug.info("Game Over")
-                if self.data.config.mqtt_enabled:
-                    # Add game state onto queue
-                    qPayload = "gameover"
-                    qItem = ["{0}/state".format(self.data.config.mqtt_main_topic),qPayload]
-                    self.sbQueue.put_nowait(qItem)
+                elif self.scoreboard.is_final:
+                    """ Post Game state """
+                    debug.info("FINAL")
 
-                sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
-                self.check_new_goals()
-                """ if self.data.isPlayoff and self.data.stanleycup_round:
-                    self.data.check_stanley_cup_champion()
-                    if self.data.cup_winner_id:
-                        StanleyCupChampions(self.data, self.matrix, self.sleepEvent).render() """
+                    sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
+                    self.check_new_goals()
+                    """ if self.data.isPlayoff and self.data.stanleycup_round:
+                        self.data.check_stanley_cup_champion()
+                        if self.data.cup_winner_id:
+                            StanleyCupChampions(self.data, self.matrix, self.sleepEvent).render() """
+                    self.__render_postgame(sbrenderer)
 
-                self.__render_postgame(sbrenderer)
-                self.sleepEvent.wait(self.refresh_rate)
-                if not self.goal_team_cache:
-                    self.boards._post_game(self.data, self.matrix,self.sleepEvent)
+                    self.sleepEvent.wait(self.refresh_rate)
+                    if not self.goal_team_cache:
+                        self.boards._post_game(self.data, self.matrix,self.sleepEvent)
 
-            elif self.scoreboard.is_final:
-                """ Post Game state """
-                debug.info("FINAL")
-
-                sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
-                self.check_new_goals()
-                """ if self.data.isPlayoff and self.data.stanleycup_round:
-                    self.data.check_stanley_cup_champion()
-                    if self.data.cup_winner_id:
-                        StanleyCupChampions(self.data, self.matrix, self.sleepEvent).render() """
-                self.__render_postgame(sbrenderer)
-
-                self.sleepEvent.wait(self.refresh_rate)
-                if not self.goal_team_cache:
-                    self.boards._post_game(self.data, self.matrix,self.sleepEvent)
-
-            elif self.scoreboard.is_scheduled:
-                """ Pre-game state """
-                debug.info("Game is Scheduled")
-                #blocks the screensaver from running if game is live or scheduled
-                self.data.screensaver_livegame = True
-                sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
-                self.__render_pregame(sbrenderer)
-                #sleep(self.refresh_rate)
-                self.sleepEvent.wait(self.refresh_rate)
-                self.boards._scheduled(self.data, self.matrix,self.sleepEvent)
+                elif self.scoreboard.is_scheduled:
+                    """ Pre-game state """
+                    debug.info("Game is Scheduled")
+                    #blocks the screensaver from running if game is live or scheduled
+                    self.data.screensaver_livegame = True
+                    sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
+                    self.__render_pregame(sbrenderer)
+                    #sleep(self.refresh_rate)
+                    self.sleepEvent.wait(self.refresh_rate)
+                    self.boards._scheduled(self.data, self.matrix,self.sleepEvent)
 
 
-            elif self.scoreboard.is_irregular:
-                """ Irregular game state (postponed, cancelled, suspended, TBD) """
-                debug.info("Game is irregular")
-                sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
-                self.__render_irregular(sbrenderer)
-                #sleep(self.refresh_rate)
-                self.sleepEvent.wait(self.refresh_rate)
-                self.boards._scheduled(self.data, self.matrix,self.sleepEvent)
-            else:
-                print("somethin' really goofy")
-                self.sleepEvent.wait(self.refresh_rate)
-            self.data.refresh_data()
-            self.data.refresh_overview()
-            self.scoreboard = Scoreboard(self.data.overview, self.data)
-            if self.data.network_issues:
-                self.matrix.network_issue_indicator()
+                elif self.scoreboard.is_irregular:
+                    """ Irregular game state (postponed, cancelled, suspended, TBD) """
+                    debug.info("Game is irregular")
+                    sbrenderer = ScoreboardRenderer(self.data, self.matrix, self.scoreboard)
+                    self.__render_irregular(sbrenderer)
+                    #sleep(self.refresh_rate)
+                    self.sleepEvent.wait(self.refresh_rate)
+                    self.boards._scheduled(self.data, self.matrix,self.sleepEvent)
+                else:
+                    print("somethin' really goofy")
+                    self.sleepEvent.wait(self.refresh_rate)
+                # Refresh game data (team schedules handled by TeamSummaryWorker)
+                self.data.refresh_data()
+                self.data.refresh_overview()
+                self.scoreboard = Scoreboard(self.data.overview, self.data)
+                if self.data.network_issues:
+                    self.matrix.network_issue_indicator()
 
-            if self.data.newUpdate and not self.data.config.clock_hide_indicators:
-                self.matrix.update_indicator()
+                if self.data.newUpdate and not self.data.config.clock_hide_indicators:
+                    self.matrix.update_indicator()
+
+        finally:
+            # Stop LiveGameWorker when exiting game day mode
+            debug.info("Stopping LiveGameWorker (exiting game day mode)")
+            self.data.live_game_worker.stop_monitoring()
 
 
     def __render_pregame(self, sbrenderer):
