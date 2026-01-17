@@ -327,12 +327,7 @@
             </select>
         </div>
 
-        <div>
-            <label>Config File</label>
-            <select id="fileSelect" onchange="loadConfig()">
-                <option value="">Loading...</option>
-            </select>
-        </div>
+
 
         <hr style="border-color:#444; width:100%">
         <div>
@@ -447,7 +442,8 @@
             </div>
 
             <div class="emu-controls">
-                <button onclick="launchEmulator()" style="background:#28a745;">Launch</button>
+                <button onclick="launchEmulator('iframe')" style="background:#28a745;">Launch</button>
+                <button onclick="launchEmulator('window')" style="background:#17a2b8;">Launch New Window</button>
                 <button onclick="stopEmulator()" class="danger">Stop</button>
                 <button class="secondary" onclick="toggleEmulatorCollapse()">Collapse</button>
             </div>
@@ -493,23 +489,9 @@
         let emulatorRunning = false;
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetch('/api/files')
-                .then(r => r.json())
-                .then(files => {
-                    const sel = document.getElementById('fileSelect');
-                    sel.innerHTML = '';
-                    files.forEach(f => {
-                        const opt = document.createElement('option');
-                        opt.value = f;
-                        opt.textContent = f;
-                        sel.appendChild(opt);
-                    });
-
-                    // Restore state BEFORE verifying status
-                    loadState(files);
-
-                    checkEmulatorStatus(true);
-                });
+            // Restore state BEFORE verifying status
+            loadState();
+            checkEmulatorStatus(true);
 
             setupDrag();
 
@@ -536,49 +518,7 @@
                 .then(r => r.json())
                 .then(layoutData => {
                     layoutConfig = layoutData;
-
-                    // File selection logic
-                    let expectedFile = `logos_${sizeStr}.json`;
-
-                    // Override with restored file if valid and matches size
-                    // Note: If user restored a 64x32 file but switched to 128x64, we might not want to restore it.
-                    // Simple check: if restored file is in the select options, verify it matches size?
-                    // Or just blindly trust user choice if it exists.
-                    if (window.restoreFile) {
-                        const sel = document.getElementById('fileSelect');
-                        // check if restoreFile exists in options
-                        let exists = false;
-                        for (let i = 0; i < sel.options.length; i++) {
-                            if (sel.options[i].value === window.restoreFile) {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        if (exists) {
-                            expectedFile = window.restoreFile;
-                            window.restoreFile = null; // consume it
-                        }
-                    }
-
-                    const sel = document.getElementById('fileSelect');
-                    let optionFound = false;
-                    for (let i = 0; i < sel.options.length; i++) {
-                        if (sel.options[i].value === expectedFile) {
-                            sel.selectedIndex = i;
-                            optionFound = true;
-                            break;
-                        }
-                    }
-                    // Create if missing logic (existing) ...
-                    if (!optionFound) {
-                        const opt = document.createElement('option');
-                        opt.value = expectedFile;
-                        opt.textContent = expectedFile;
-                        sel.appendChild(opt);
-                        sel.value = expectedFile;
-                    } else {
-                        sel.value = expectedFile;
-                    }
+                    const expectedFile = `logos_${sizeStr}.json`;
                     loadConfig(expectedFile);
                 })
                 .catch(err => {
@@ -597,8 +537,9 @@
         }
 
         function loadConfig(specificFilename = null) {
-            const filename = specificFilename || document.getElementById('fileSelect').value;
-            if (!filename) return;
+            const sizeStr = document.getElementById('sizeSelect').value;
+            const filename = specificFilename || `logos_${sizeStr}.json`;
+
             currentFileName = filename;
             if (!specificFilename) saveState(); // Save on manual change
 
@@ -703,10 +644,6 @@
                     } else {
                         dot.classList.remove('running');
                         if (isInit) {
-                            const sel = document.getElementById('fileSelect');
-                            for (let i = 0; i < sel.options.length; i++) {
-                                if (sel.options[i].value.includes('64x32')) sel.selectedIndex = i;
-                            }
                             loadMatrixSize(false);
                         }
                     }
@@ -838,7 +775,6 @@
         function saveState() {
             const state = {
                 size: document.getElementById('sizeSelect').value,
-                file: document.getElementById('fileSelect').value,
                 team: document.getElementById('teamSelect').value,
                 stance: document.getElementById('stanceSelect').value,
 
@@ -851,7 +787,7 @@
             localStorage.setItem('nhl_editor_state', JSON.stringify(state));
         }
 
-        function loadState(filesList) {
+        function loadState() {
             const saved = localStorage.getItem('nhl_editor_state');
             if (!saved) return;
 
@@ -866,18 +802,6 @@
                         // Don't trigger loadMatrixSize here, it's called by checkEmulatorStatus or manual call
                         // But we need to make sure global vars are set
                     }
-                }
-
-                // File - logic in loadMatrixSize handles default selection, but we can override
-                if (state.file && filesList && filesList.includes(state.file)) {
-                    // We let loadMatrixSize flow handle this usually, but it picks default logos_W.json
-                    // We might want to override that inside loadMatrixSize callback or just set it
-                    // Actually simplest: let loadMatrixSize run, it sets default. Then we override if needed?
-                    // Or just set the select value and call loadConfig?
-                    // Since loadMatrixSize is complex, let's just let it run, it uses defaults. 
-                    // We can try to restore "file" after loadMatrixSize if we carefully chain it.
-                    // But simpler: just store it in a var and check it inside loadMatrixSize callbacks.
-                    window.restoreFile = state.file;
                 }
 
                 // Team & Stance - restore after config loads
@@ -899,7 +823,7 @@
             }
         }
 
-        function launchEmulator() {
+        function launchEmulator(target = 'iframe') {
             const status = document.getElementById('statusMsg');
             status.innerText = "Launching Emulator...";
             const loader = document.getElementById('emuLoader');
@@ -907,17 +831,25 @@
             const wrapper = document.getElementById('emuWrapper');
             const mode = document.getElementById('emuMode').value;
 
-            wrapper.classList.remove('collapsed');
-
-            // Only show loader/iframe if intended (simulator might just be backend logs initially?)
-            // But we assume simulator also renders to the same port, so we can view it.
-            loader.style.display = 'flex';
-            iframe.src = 'about:blank';
+            if (target === 'iframe') {
+                wrapper.classList.remove('collapsed');
+                // Only show loader/iframe if intended (simulator might just be backend logs initially?)
+                // But we assume simulator also renders to the same port, so we can view it.
+                loader.style.display = 'flex';
+                iframe.src = 'about:blank';
+            } else {
+                window.open(`http://localhost:{{ emulator_port }}`, '_blank');
+            }
 
             const payload = { w: matrixW, h: matrixH, mode: mode };
 
             if (mode === 'simulator') {
-                payload.team = document.getElementById('teamSelect').value;
+                let teamVal = document.getElementById('teamSelect').value;
+                // Strip suffix like "|alt" for the simulator backend
+                if (teamVal.includes('|')) {
+                    teamVal = teamVal.split('|')[0];
+                }
+                payload.team = teamVal;
                 payload.date = document.getElementById('simDate').value;
                 payload.speed = document.getElementById('simSpeed').value;
                 payload.stop_at_end = document.getElementById('simStopAtEnd').checked;
@@ -961,9 +893,11 @@
                                         if (data.ready) {
                                             status.innerText = "Emulator Online!";
                                             status.style.color = "lightgreen";
-                                            iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
-                                            iframe.onload = () => { loader.style.display = 'none'; };
-                                            setTimeout(() => { loader.style.display = 'none'; }, 1000);
+                                            if (target === 'iframe') {
+                                                iframe.src = `http://localhost:{{ emulator_port }}?t=${new Date().getTime()}`;
+                                                iframe.onload = () => { loader.style.display = 'none'; };
+                                                setTimeout(() => { loader.style.display = 'none'; }, 1000);
+                                            }
                                             checkEmulatorStatus();
                                         } else {
                                             if (attempts < maxAttempts) {
@@ -1068,24 +1002,6 @@
                 .then(layoutData => {
                     layoutConfig = layoutData;
                     const expectedFile = `logos_${sizeStr}.json`;
-                    const sel = document.getElementById('fileSelect');
-                    let optionFound = false;
-                    for (let i = 0; i < sel.options.length; i++) {
-                        if (sel.options[i].value === expectedFile) {
-                            sel.selectedIndex = i;
-                            optionFound = true;
-                            break;
-                        }
-                    }
-                    if (!optionFound) {
-                        const opt = document.createElement('option');
-                        opt.value = expectedFile;
-                        opt.textContent = expectedFile;
-                        sel.appendChild(opt);
-                        sel.value = expectedFile;
-                    } else {
-                        sel.value = expectedFile;
-                    }
                     loadConfig(expectedFile);
                 })
                 .catch(err => {
@@ -1096,7 +1012,7 @@
 
             if (userTriggered && emulatorRunning) {
                 if (confirm(`Matrix size changed to ${sizeStr}. Restart the emulator with this resolution?`)) {
-                    launchEmulator();
+                    launchEmulator('iframe');
                 }
             }
         }
@@ -1131,20 +1047,7 @@
             lines[2].style.height = cssScoreSize + 'px';
         }
 
-        function loadConfig(specificFilename = null) {
-            const filename = specificFilename || document.getElementById('fileSelect').value;
-            if (!filename) return;
-            currentFileName = filename;
-            document.getElementById('adjustmentsFile').innerText = `(${filename})`;
-            fetch('/api/config/' + filename + '?t=' + new Date().getTime())
-                .then(r => r.json())
-                .then(data => {
-                    currentConfig = data;
-                    refreshTeamList();
-                    updateUI();
-                })
-                .catch(err => console.error("Config load failed", err));
-        }
+
 
         function refreshTeamList() {
             const sel1 = document.getElementById('teamSelect');

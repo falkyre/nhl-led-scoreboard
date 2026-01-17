@@ -61,8 +61,8 @@ else:
 try:
     import cairosvg
     from PIL import Image
-except ImportError as e:
-    print(f"Warning: Image libraries not found ({e}). Logo generation will not work.")
+except (ImportError, OSError) as e:
+    print(f"Warning: Image libraries not found or system dependency missing ({e}). Logo generation will not work.")
     cairosvg = None
 
 app = Flask(__name__, template_folder='templates')
@@ -103,6 +103,10 @@ def index():
 
 def fetch_opponent_team(team_abbr, date_str):
     try:
+        # Strip suffix if present (e.g. WSH|alt -> WSH)
+        if '|' in team_abbr:
+            team_abbr = team_abbr.split('|')[0]
+            
         url = f"https://api-web.nhle.com/v1/club-schedule/{team_abbr}/week/{date_str}"
         print(f"[Backend] Fetching schedule: {url}")
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -131,6 +135,7 @@ def get_opponent():
     if not team or not date_str:
         return jsonify({"error": "Missing team or date"}), 400
     
+    
     result = fetch_opponent_team(team, date_str)
     if result:
         opp_abbr, is_away = result
@@ -140,6 +145,10 @@ def get_opponent():
 
 def fetch_team_schedule(team_abbr, month_str):
     try:
+        # Strip suffix if present (e.g. WSH|alt -> WSH)
+        if '|' in team_abbr:
+            team_abbr = team_abbr.split('|')[0]
+
         # month_str expected as YYYY-MM
         url = f"https://api-web.nhle.com/v1/club-schedule/{team_abbr}/month/{month_str}"
         print(f"[Backend] Fetching monthly schedule: {url}")
@@ -161,6 +170,7 @@ def get_schedule():
     month = request.args.get('month') # YYYY-MM
     if not team or not month:
         return jsonify({"error": "Missing team or month"}), 400
+    
     
     dates = fetch_team_schedule(team, month)
     return jsonify({"dates": dates})
@@ -337,8 +347,44 @@ def handle_config(filename):
                     try:
                         with open(base_file, 'r') as f:
                             base_data = json.load(f)
-                        with open(file_path, 'w') as f:
-                            json.dump(base_data, f, indent=2)
+                        
+                        # Inject requested defaults
+                        if 'scoreboard' in base_data and 'logos' in base_data['scoreboard']:
+                            # Clear out existing team data, keeping only _default structure to be overwritten
+                            base_data['scoreboard']['logos'] = {}
+                            
+                            base_data['scoreboard']['logos']['_default'] = {
+                                "zoom": "100%",
+                                "position": [0, 0],
+                                "flip": 0,
+                                "rotate": 0,
+                                "crop": [0, 0, 0, 0],
+                                "home": {
+                                    "zoom": "100%",
+                                    "position": [0, 0],
+                                    "flip": 0,
+                                    "rotate": 0,
+                                    "crop": [0, 0, 0, 0]
+                                },
+                                "away": {
+                                    "zoom": "100%",
+                                    "position": [0, 0],
+                                    "flip": 0,
+                                    "rotate": 0,
+                                    "crop": [0, 0, 0, 0]
+                                }
+                            }
+                        
+                        # Also clean up team_summary logos if present to be consistent
+                        if 'team_summary' in base_data and 'logos' in base_data['team_summary']:
+                             base_data['team_summary']['logos'] = {
+                                 "_default": base_data['team_summary']['logos'].get('_default', {
+                                    "zoom": "100%",
+                                    "position": [0, 0]
+                                 })
+                             }
+
+                        return jsonify(base_data)
                     except Exception as e:
                         return jsonify({"status": "error", "message": str(e)}), 500
             
@@ -347,13 +393,40 @@ def handle_config(filename):
                 return jsonify({})
 
         with open(file_path, 'r') as f:
-            return jsonify(json.load(f))
+            data = json.load(f)
+            
+        # Ensure _default exists and inject for missing teams
+        if filename.startswith('logos_') and 'scoreboard' in data and 'logos' in data['scoreboard']:
+            logos = data['scoreboard']['logos']
+            default_logo = logos.get('_default')
+            
+            # If _default is missing in the file, we might want to inject a hardcoded one or one from 64x32?
+            # For now, let's assume if it's missing we can't do much or use a safe fallback.
+            # But the user request implies using THE _default (which usually exists).
+            if default_logo:
+                for team in TEAMS:
+                    if team not in logos:
+                        logos[team] = json.loads(json.dumps(default_logo)) # Deep copy
+            
+        return jsonify(data)
     
     if request.method == 'POST':
         try:
             if os.path.exists(file_path):
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 shutil.copy2(file_path, f"{file_path}.{timestamp}.bak")
+                
+                # Limit backups to 5 copies
+                try:
+                    backups = sorted([
+                        f for f in os.listdir(CONFIG_DIR) 
+                        if f.startswith(f"{filename}.") and f.endswith(".bak")
+                    ])
+                    while len(backups) > 5:
+                        oldest = backups.pop(0)
+                        os.remove(os.path.join(CONFIG_DIR, oldest))
+                except Exception as cleanup_error:
+                    print(f"Warning: Failed to cleanup old backups: {cleanup_error}")
             new_data = request.json
             with open(file_path, 'w') as f:
                 json.dump(new_data, f, indent=2)
