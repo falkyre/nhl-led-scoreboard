@@ -197,6 +197,81 @@ def run_simulation():
     # 5. Start Main Application
     logger.info(f"Starting Scoreboard... Simulated Time: {simulator.get_current_time()}")
     
+    # -------------------------------------------------------------------------
+    # MONKEYPATCH: Override Preferred Teams in ScoreboardConfig
+    # -------------------------------------------------------------------------
+    # We need to inject the simulated team into the preferred_teams list.
+    # However, ScoreboardConfig expects the full team name (e.g. "Los Angeles Kings")
+    # or a common name that matches its internal logic, not just the abbreviation (e.g. "LAK").
+    # We will load the team mapping, find the name, and then wrap ScoreboardConfig._load_attributes.
+    
+    import data.scoreboard_config
+    
+    # Load team mapping from backup_teams_data.json
+    # This file maps abbreviations (triCode) to full names
+    teams_data_path = os.path.join(src_dir, "data", "backup_teams_data.json")
+    team_name_to_inject = None
+    
+    try:
+        with open(teams_data_path, 'r') as f:
+            tdata = json.load(f)
+            for t in tdata.get("data", []):
+                if t.get("triCode") == team or t.get("rawTricode") == team:
+                    # Found the team. The scoreboard logic in data.py matches against 'allteams_id' keys.
+                    # 'allteams_id' keys are full names like 'Los Angeles Kings'.
+                    # Let's try using the 'fullName' from the json.
+                    team_name_to_inject = t.get("fullName")
+                    break
+        
+        if team_name_to_inject:
+             logger.info(f"Resolved team '{team}' to '{team_name_to_inject}' for injection.")
+        else:
+             logger.warning(f"Could not resolve full name for team '{team}'. Injection might fail.")
+             team_name_to_inject = team # Fallback
+             
+    except Exception as e:
+        logger.error(f"Failed to load team data for mapping: {e}")
+        team_name_to_inject = team
+
+    # Store the original method
+    original_load_attributes = data.scoreboard_config.ScoreboardConfig._load_attributes
+
+    def mocked_load_attributes(self, json_data):
+        # Call the original method to populate self.preferred_teams and others
+        original_load_attributes(self, json_data)
+        
+        # Now inject our team
+        if team_name_to_inject:
+             # The preferred_teams list usually contains common names like "Jets" or "Kings"
+             # OR full names. The matching logic in data.py -> get_pref_teams_id() does:
+             # res = {key: val for key, val in allteams_id.items() if team in key}
+             # So if we have "Los Angeles Kings", passing "Kings" works. Passing "Los Angeles Kings" works.
+             # Passing "LAK" fails because "LAK" is not in "Los Angeles Kings".
+             
+             # We will try to be safe. If the full name is "Los Angeles Kings", we can inject that.
+             # But wait, config.json usually has "Jets", "Leafs". 
+             # data.py checks: if team in key.
+             # "Kings" in "Los Angeles Kings" -> True.
+             # "Los Angeles Kings" in "Los Angeles Kings" -> True.
+             
+             if team_name_to_inject not in self.preferred_teams:
+                  # Check if it's already there in some form (simple check)
+                  already_present = False
+                  for pt in self.preferred_teams:
+                      if pt in team_name_to_inject or team_name_to_inject in pt:
+                          already_present = True
+                          break
+                  
+                  if not already_present:
+                       logger.info(f"Injecting '{team_name_to_inject}' into preferred teams list.")
+                       self.preferred_teams.append(team_name_to_inject)
+                  else:
+                       logger.info(f"Team '{team_name_to_inject}' seems to be already preferred.")
+
+    # Apply the patch
+    data.scoreboard_config.ScoreboardConfig._load_attributes = mocked_load_attributes
+    # -------------------------------------------------------------------------
+
     import main
     try:
         main.run()
