@@ -445,7 +445,8 @@
                 <button onclick="launchEmulator('iframe')" style="background:#28a745;">Launch</button>
                 <button onclick="launchEmulator('window')" style="background:#17a2b8;">Launch New Window</button>
                 <button onclick="stopEmulator()" class="danger">Stop</button>
-                <button class="secondary" onclick="toggleEmulatorCollapse()">Collapse</button>
+                <button id="btnCollapse" class="secondary" onclick="toggleEmulatorCollapse()"
+                    style="display:none;">Collapse</button>
             </div>
         </div>
 
@@ -837,8 +838,14 @@
                 // But we assume simulator also renders to the same port, so we can view it.
                 loader.style.display = 'flex';
                 iframe.src = 'about:blank';
+                // Show collapse button and reset text
+                const btn = document.getElementById('btnCollapse');
+                btn.style.display = 'inline-block';
+                btn.innerText = 'Collapse';
             } else {
                 window.open(`http://localhost:{{ emulator_port }}`, '_blank');
+                // Hide collapse button if launching new window
+                document.getElementById('btnCollapse').style.display = 'none';
             }
 
             const payload = { w: matrixW, h: matrixH, mode: mode };
@@ -964,6 +971,12 @@
         function toggleEmulatorCollapse() {
             const el = document.getElementById('emuWrapper');
             el.classList.toggle('collapsed');
+            const btn = document.getElementById('btnCollapse');
+            if (el.classList.contains('collapsed')) {
+                btn.innerText = "Open";
+            } else {
+                btn.innerText = "Collapse";
+            }
         }
 
         function loadMatrixSize(userTriggered = false) {
@@ -999,6 +1012,13 @@
 
             fetch(`/api/config/layout_${sizeStr}.json`)
                 .then(r => r.json())
+                .then(layoutData => {
+                    if (!layoutData || Object.keys(layoutData).length === 0) {
+                        console.log(`Layout ${sizeStr} not found/empty. Falling back to layout.json.`);
+                        return fetch('/api/config/layout.json').then(r => r.json());
+                    }
+                    return layoutData;
+                })
                 .then(layoutData => {
                     layoutConfig = layoutData;
                     const expectedFile = `logos_${sizeStr}.json`;
@@ -1180,16 +1200,17 @@
             // CORRECTED DEFAULTS: Away (Left side) -> Aligned Right (growing Left from center)
             let align = (stance === 'away') ? 'right' : 'left';
 
-            if (layoutConfig && (layoutConfig.home_logo || layoutConfig.away_logo)) {
+            if (layoutConfig && layoutConfig.scoreboard) {
                 const key = (stance === 'home') ? 'home_logo' : 'away_logo';
-                if (layoutConfig[key]) {
-                    if (layoutConfig[key].position) {
-                        const posDef = layoutConfig[key].position;
+                const logoConf = layoutConfig.scoreboard[key];
+                if (logoConf) {
+                    if (logoConf.position) {
+                        const posDef = logoConf.position;
                         x = parseLayoutCoord(posDef[0], matrixW);
                         y = parseLayoutCoord(posDef[1], matrixH);
                     }
-                    if (layoutConfig[key].align) {
-                        align = layoutConfig[key].align;
+                    if (logoConf.align) {
+                        align = logoConf.align;
                     }
                 }
             }
