@@ -17,6 +17,8 @@ Run the simulator script from the root of the project:
 ```bash
 python3 src/scripts/start_simulation.py [options] [scoreboard_arguments]
 ```
+> [!NOTE]
+> The simulator DOES not work with the pi5_launcher.py script.  If you are using a pi5, you can use the RGBME emulator's`pi5` adapter instead.
 
 ### Options
 

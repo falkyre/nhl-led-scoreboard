@@ -36,7 +36,7 @@ Ensure you have the following installed (these are included in `requirements-pi5
 
 
 > [!CAUTION]
-> Do **NOT** install the `rpi-rgb-led-matrix` library. It is not compatible with the Raspberry Pi 5.  Do not run the `scripts/install.sh` script.  It will install the `rpi-rgb-led-matrix` library.  An new install.sh will be created for the Pi5 at a future time.
+> Do **NOT** install the `rpi-rgb-led-matrix` library. It is not compatible with the Raspberry Pi 5.  The `scripts/install.sh` script will not install the `rpi-rgb-led-matrix` library now as it checks to see if it's being run on a pi5.  
 
 > [!TIP]
 > You can use the `"scripts/sbtools/sb-init"` script to skip the steps below and install the required dependencies.  It will create the virtual environment and install the required packages as well as the udev rules for the pi5.
@@ -49,6 +49,9 @@ pip3 install -r requirements-pi5.txt
 ```
 
 ## Non-Root User Configuration
+
+> [!NOTE]
+> If you are using the `scripts/install.sh` script, you can skip this section.
 
 By default, root privilege is required to access the PIO hardware. To allow a standard user to run the launcher without `sudo`, you must configure a `udev` rule.
 
@@ -72,7 +75,7 @@ Once you have configured the udev rules, you can run the launcher without `sudo`
 The launcher relies on a specific configuration file for the emulator to ensure it exposes the raw data correctly. A sample configuration is provided as `pi5_emulator_config.json`. 
 
 > [!IMPORTANT]
-> You **MUST** rename `pi5_emulator_config.json` to `emulator_config.json` for the emulator to load it.
+> You **MUST** rename `pi5_emulator_config.json` to `emulator_config.json` for the emulator to load it. If you are using the `scripts/install.sh` script, you can skip this step as it will rename the file for you.
 
 > [!CAUTION]
 > Do **NOT** use the `pi5` adapter in the emulator configuration with the `pi5_launcher.py` script.  It will have double processing of the pixel data and cause the display to be garbled.  *ALWAYS* use the `raw` adapter instead.  
