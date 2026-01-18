@@ -1010,7 +1010,7 @@
                 gradImg.style.display = 'none';
             }
 
-            fetch(`/api/config/layout_${sizeStr}.json`)
+            fetch(`/api/config/layout_${sizeStr}.json?t=${new Date().getTime()}`)
                 .then(r => r.json())
                 .then(layoutData => {
                     if (!layoutData || Object.keys(layoutData).length === 0) {
@@ -1195,7 +1195,10 @@
         }
 
         function getAnchorPoint(stance) {
-            let x = (stance === 'away') ? matrixW * 0.25 : matrixW * 0.75;
+            // Default to 50% +/- 15px logic which matches layout.json and layout_64x32.json
+            const center = matrixW / 2;
+            const offset = 15;
+            let x = (stance === 'away') ? (center - offset) : (center + offset);
             let y = 0;
             // CORRECTED DEFAULTS: Away (Left side) -> Aligned Right (growing Left from center)
             let align = (stance === 'away') ? 'right' : 'left';

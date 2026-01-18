@@ -447,6 +447,10 @@ def serve_assets(filename):
         logo_type = match.group(2)
         w = int(match.group(3))
         h = int(match.group(4))
+
+        # If height is 32, force use of 64x32 logos (don't download 128x32 etc)
+        if h == 32 and w != 64:
+            return serve_assets(filename.replace(f"{w}x{h}", "64x32"))
         
         svg_suffix = 'light'
         if logo_type in ['alt', 'dark']:
