@@ -5,7 +5,7 @@ NHL LED Scoreboard Cache Manager CLI
 A command-line tool to view, inspect, and manage the scoreboard cache.
 
 Usage:
-    python scripts/cache_manager.py [command] [options]
+    python src/scripts/cache_manager.py [command] [options]
 
 Commands:
     list        List all cache entries with summary info
@@ -16,11 +16,11 @@ Commands:
     workers     Show worker-specific cache info
 
 Examples:
-    python scripts/cache_manager.py list
-    python scripts/cache_manager.py inspect nhl_standings
-    python scripts/cache_manager.py delete nhl_games_today
-    python scripts/cache_manager.py clear --confirm
-    python scripts/cache_manager.py workers
+    python src/scripts/cache_manager.py list
+    python src/scripts/cache_manager.py inspect nhl_standings
+    python src/scripts/cache_manager.py delete nhl_games_today
+    python src/scripts/cache_manager.py clear --confirm
+    python src/scripts/cache_manager.py workers
 """
 
 import argparse
