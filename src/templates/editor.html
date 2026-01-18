@@ -307,6 +307,58 @@
             text-align: right;
             min-height: 1.2em;
         }
+
+        /* Calendar Highlights */
+        /* Use pseudo-elements for underlines to avoid border-radius making them curved */
+        .flatpickr-day.home-game,
+        .flatpickr-day.away-game {
+            position: relative;
+        }
+
+        .flatpickr-day.home-game::after,
+        .flatpickr-day.away-game::after {
+            content: "";
+            position: absolute;
+            bottom: 3px;
+            left: 15%;
+            width: 70%;
+            height: 2px;
+            border-radius: 0;
+        }
+
+        .flatpickr-day.home-game::after {
+            background-color: #00ff00;
+        }
+
+        .flatpickr-day.away-game::after {
+            background-color: #00ccff;
+        }
+
+        /* Remove old border approach if it conflicts and ensure hover states don't break it */
+        .flatpickr-day.home-game:hover,
+        .flatpickr-day.away-game:hover {
+            background: #333;
+        }
+
+        .calendar-legend {
+            display: flex;
+            gap: 15px;
+            font-size: 0.8em;
+            margin-top: 0;
+            color: #aaa;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
@@ -333,6 +385,15 @@
         <div>
             <label style="color:var(--accent)">Main Team (Editing)</label>
             <select id="teamSelect" onchange="updateUI()"></select>
+            <div style="margin-top:5px; display:flex; gap:5px;">
+                <button id="btnUploadFile" onclick="triggerAltUpload()"
+                    style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
+                    File</button>
+                <button id="btnUploadUrl" onclick="triggerAltUrlUpload()"
+                    style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
+                    from URL</button>
+                <input type="file" id="altUploadInput" accept="image/*" style="display:none">
+            </div>
         </div>
         <div class="row">
             <div>
@@ -453,6 +514,18 @@
         <!-- Simulator Options Panel -->
         <div id="simOptions"
             style="display:none; background:#222; padding:10px; border-bottom:1px solid #444; gap:10px; align-items:center; flex-wrap:wrap;">
+
+            <div class="calendar-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: transparent; border-bottom: 2px solid #00ff00;"></div>
+                    <span>Home Game</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: transparent; border-bottom: 2px solid #00ccff;"></div>
+                    <span>Away Game</span>
+                </div>
+            </div>
+
             <div style="flex: 1 1 auto;">
                 <label style="font-size:0.8em; color:#aaa; margin-bottom:2px;">Game Date</label>
                 <input type="text" id="simDate" style="width:100%; padding:4px;" placeholder="Select Date...">
@@ -499,13 +572,85 @@
             // Add listeners for saving state
             document.getElementById('simSpeed').addEventListener('change', saveState);
             document.getElementById('simStopAtEnd').addEventListener('change', saveState);
+
+            document.getElementById('altUploadInput').addEventListener('change', handleAltUpload);
         });
 
-        // ... (parseLayoutCoord, updateActualCoordinates skipped) ...
+        function triggerAltUpload() {
+            document.getElementById('altUploadInput').click();
+        }
 
-        function checkEmulatorStatus(isInit = false) {
-            // ... existing checks ...
-            // Logic inside checkEmulatorStatus calls loadMatrixSize(false)
+        function triggerAltUrlUpload() {
+            const team = document.getElementById('teamSelect').value;
+            if (!team) {
+                alert("Please select a team first.");
+                return;
+            }
+            const url = prompt("Enter Image URL:");
+            if (!url) return;
+
+            uploadAltData(team, null, url);
+        }
+
+        function handleAltUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const team = document.getElementById('teamSelect').value;
+            if (!team) {
+                alert("Please select a team first.");
+                return;
+            }
+
+            uploadAltData(team, file, null);
+            event.target.value = ''; // Reset
+        }
+
+        function uploadAltData(team, file, url) {
+            const createHires = confirm("Do you also want to generate this logo for High Res (128x64) displays?");
+
+            // Ensure we use the clean team name (no |alt) for backend
+            const cleanTeam = team.includes('|') ? team.split('|')[0] : team;
+
+            const formData = new FormData();
+            formData.append('team', cleanTeam);
+            formData.append('create_hires', createHires);
+            if (file) {
+                formData.append('file', file);
+            } else if (url) {
+                formData.append('url', url);
+            }
+
+            fetch('/api/upload_alt', {
+                method: 'POST',
+                body: formData
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert("Upload successful!");
+
+                        // The backend should have updated the config to include 'alt' for this team.
+                        // We need to reload the config to see it in the list.
+                        // We also want to auto-select it.
+                        let targetTeam = team;
+                        if (!team.includes('|alt')) {
+                            targetTeam = team + '|alt';
+                        }
+
+                        // Set global restore request (handled in loadConfig callback)
+                        window.restoreTeam = targetTeam;
+
+                        loadConfig();
+
+                    } else {
+                        alert("Upload failed: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error("Upload error", err);
+                    alert("Upload failed: " + err);
+                });
         }
 
         // ... (skip down to loadMatrixSize) ...
@@ -714,23 +859,52 @@
             fetch(`/api/schedule?team=${team}&month=${monthStr}`)
                 .then(r => r.json())
                 .then(data => {
-                    if (data.dates) {
-                        scheduleCache[cacheKey] = data.dates;
-                        updateDatePickerEnabled(data.dates);
+                    if (data.games) {
+                        scheduleCache[cacheKey] = data.games;
+                        updateDatePickerEnabled(data.games);
                     }
                 })
                 .catch(e => console.error("Schedule fetch error", e));
         }
 
-        function updateDatePickerEnabled(dates) {
+        function updateDatePickerEnabled(games) {
             if (!datePicker) return;
 
-            // Flatpickr 'enable' option takes an array of date strings or functions.
-            // We want to ENABLE only the dates in the list.
-            // But we also want to allow navigation.
+            // Extract dates for 'enable'
+            const dates = games.map(g => g.date);
 
-            // To "highlight" and allow selection only of game days:
+            // Map dates to types for easy lookup
+            const gameTypes = {};
+            games.forEach(g => {
+                gameTypes[g.date] = g.type;
+            });
+
+            // Update configuration
+            // We use onDayCreate to add classes
             datePicker.set('enable', dates);
+
+            // We need to inject the gameTypes into the instance so onDayCreate can access it
+            // independently of this closure if needed, or we just rely on redraw triggering onDayCreate
+            // which we can hook now.
+
+            // Flatpickr doesn't let us easily binding per-refresh data unless we just update the hook.
+            // Let's update the onDayCreate hook dynamically? Or use a global/mapped variable.
+            // Let's attach to the instance.
+            datePicker.element.dataset.gameTypes = JSON.stringify(gameTypes);
+
+            // Update the hook to read this
+            datePicker.set("onDayCreate", function (dObj, dStr, fp, dayElem) {
+                const dateStr = dayElem.dateObj.toISOString().split('T')[0];
+                const types = JSON.parse(fp.element.dataset.gameTypes || "{}");
+
+                if (types[dateStr]) {
+                    if (types[dateStr] === 'home') {
+                        dayElem.classList.add('home-game');
+                    } else if (types[dateStr] === 'away') {
+                        dayElem.classList.add('away-game');
+                    }
+                }
+            });
 
             // Force redraw
             datePicker.redraw();
@@ -1148,6 +1322,13 @@
             const stance1 = document.getElementById('stanceSelect').value;
             const team2Val = document.getElementById('team2Select').value;
             const sizeStr = document.getElementById('sizeSelect').value;
+
+            // Update Tooltips
+            if (team1Val) {
+                const cleanName = team1Val.split('|')[0];
+                document.getElementById('btnUploadFile').title = `Upload local file for ${cleanName}`;
+                document.getElementById('btnUploadUrl').title = `Download Logo from URL for ${cleanName}`;
+            }
 
             const getImageSrc = (val) => {
                 if (!val) return '';

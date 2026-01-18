@@ -156,10 +156,16 @@ def fetch_team_schedule(team_abbr, month_str):
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode())
         
-        dates = []
+        games_data = []
         for game in data.get("games", []):
-            dates.append(game.get("gameDate"))
-        return dates
+            game_date = game.get("gameDate")
+            # Determine if home or away
+            is_home = (game.get("homeTeam", {}).get("abbrev") == team_abbr)
+            games_data.append({
+                "date": game_date,
+                "type": "home" if is_home else "away"
+            })
+        return games_data
     except Exception as e:
         print(f"[Backend] Error fetching schedule: {e}")
         return []
@@ -172,8 +178,8 @@ def get_schedule():
         return jsonify({"error": "Missing team or month"}), 400
     
     
-    dates = fetch_team_schedule(team, month)
-    return jsonify({"dates": dates})
+    games = fetch_team_schedule(team, month)
+    return jsonify({"games": games})
 
 
 @app.route('/api/emulator/check_ready', methods=['GET'])
@@ -433,6 +439,159 @@ def handle_config(filename):
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/upload_alt', methods=['POST'])
+def upload_alt_logo():
+    team = request.form.get('team')
+    create_hires = request.form.get('create_hires') == 'true'
+    img_bytes = None
+    
+    # Check for file or URL
+    if 'file' in request.files and request.files['file'].filename != '':
+        file = request.files['file']
+        img_bytes = file.read()
+    elif 'url' in request.form and request.form.get('url'):
+        url = request.form.get('url')
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as response:
+                content_type = response.info().get_content_type()
+                if content_type == 'text/html':
+                    return jsonify({
+                        "status": "error", 
+                        "message": "The URL provided appears to be a webpage, not an image. Please right-click the image and select 'Copy Image Address' (or 'Copy Image Link')."
+                    }), 400
+                img_bytes = response.read()
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Failed to download image: {str(e)}"}), 400
+    else:
+        return jsonify({"status": "error", "message": "No file or URL provided"}), 400
+
+    if not team:
+        return jsonify({"status": "error", "message": "Missing team"}), 400
+
+    try:
+        # Determine target dimensions based on current layout
+        w = current_layout.get('w', 64)
+        h = current_layout.get('h', 32)
+        
+        # Dimensions to generate
+        targets = [{"w": w, "h": h}]
+        if create_hires:
+            targets.append({"w": 128, "h": 64})
+            
+        saved_files = []
+        
+        for tgt in targets:
+            tw, th = tgt['w'], tgt['h']
+            filename = f"{tw}x{th}.png"
+            directory = os.path.join(ASSETS_DIR, 'logos', team, 'alt')
+            full_path = os.path.join(directory, filename)
+            
+            os.makedirs(directory, exist_ok=True)
+            
+            # Backup existing
+            if os.path.exists(full_path):
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                shutil.copy2(full_path, f"{full_path}.{timestamp}.bak")
+                
+                # Limit backups (optional, similar to config)
+                try:
+                    backups = sorted([
+                        f for f in os.listdir(directory) 
+                        if f.startswith(f"{filename}.") and f.endswith(".bak")
+                    ])
+                    while len(backups) > 5:
+                        oldest = backups.pop(0)
+                        os.remove(os.path.join(directory, oldest))
+                except:
+                    pass
+
+            # Check if it's an SVG and convert if possible
+            is_svg = False
+            # Simple check for SVG header/content
+            if img_bytes.strip().startswith(b'<svg') or (b'<?xml' in img_bytes[:100] and b'<svg' in img_bytes[:300]):
+                is_svg = True
+            
+            # Additional check: If URL ends in .svg or file content type (touched via filename earlier but we have bytes now)
+            
+            if is_svg:
+                if cairosvg:
+                    print("[Upload] Detected SVG, converting to PNG...")
+                    try:
+                        img_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
+                    except Exception as e:
+                        print(f"[Upload] SVG conversion failed: {e}")
+                        # Let it fall through to PIL to fail if it really is bad
+                else:
+                    print("[Upload] Warning: SVG uploaded but cairosvg not available.")
+
+            # Resize and Save
+            with Image.open(io.BytesIO(img_bytes)) as img:
+                # Convert to RGBA
+                img = img.convert("RGBA")
+                
+                # Resize using thumbnail to preserve aspect ratio, then paste on center
+                img.thumbnail((tw, th), Image.Resampling.LANCZOS)
+                final_img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+                ox = (tw - img.width) // 2
+                oy = (th - img.height) // 2
+                final_img.paste(img, (ox, oy))
+                
+                final_img.save(full_path)
+                saved_files.append(filename)
+
+        # --- UPDATE CONFIG ---
+        # Ensure the 'alt' key exists in the current config file for this team
+        # so it appears in the dropdown
+        config_filename = f"logos_{w}x{h}.json"
+        config_path = os.path.join(CONFIG_DIR, config_filename)
+        
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                
+                updated = False
+                if 'scoreboard' in config_data and 'logos' in config_data['scoreboard']:
+                    logos = config_data['scoreboard']['logos']
+                    
+                    # Ensure team exists
+                    if team not in logos:
+                        # Copy default if exists
+                        default_logo = logos.get('_default')
+                        if default_logo:
+                             logos[team] = json.loads(json.dumps(default_logo))
+                             updated = True
+                    
+                    if team in logos:
+                        if 'alt' not in logos[team]:
+                            # Create alt from default 'home' or just generic default
+                            # Use home as base but ensure it's empty/resettable?
+                            # Or just copy the structure.
+                            # Usually alt structure mimics home/away structure
+                            base_struct = logos[team].get('home', {
+                                "zoom": "100%",
+                                "position": [0, 0],
+                                "flip": 0,
+                                "rotate": 0,
+                                "crop": [0, 0, 0, 0]
+                            })
+                            logos[team]['alt'] = json.loads(json.dumps(base_struct))
+                            updated = True
+                
+                if updated:
+                    with open(config_path, 'w') as f:
+                        json.dump(config_data, f, indent=2)
+                        
+            except Exception as e:
+                print(f"Warning: Failed to update config file for ALT logo: {e}")
+
+        return jsonify({"status": "success", "files": saved_files})
+
+    except Exception as e:
+        print(f"Upload error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
