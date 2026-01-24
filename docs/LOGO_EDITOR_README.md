@@ -1,6 +1,6 @@
 # NHL LED Scoreboard Logo Editor
 
-A web-based WYSIWYG (What You See Is What You Get) editor for positioning, sizing, and rotating team logos for the `nhl-led-scoreboard`. This tool allows you to visually tweak logo layouts for different matrix resolutions (64x32, 128x64, etc.) without manually editing JSON coordinates.
+A web-based WYSIWYG (What You See Is What You Get) editor for positioning, sizing, and rotating team logos for the `nhl-led-scoreboard`. This tool allows you to visually tweak logo layouts for different matrix resolutions (64x32, 128x32 or 128x64) without manually editing JSON coordinates.
 
 ## Features
 
@@ -8,8 +8,7 @@ A web-based WYSIWYG (What You See Is What You Get) editor for positioning, sizin
 * **Live Preview**: View the actual scoreboard emulator running in real-time below the editor. You can also select to simulate past games.
 * **Multi-Resolution Support**: Switch between 64x32, 128x64, and 128x32 layouts seamlessly.
 * **Asset Management**: Automatically downloads and converts high-quality logos from the NHL API if local assets are missing.
-* **Advanced Uploads**: Upload local files or fetch images via URL (supports PNG and SVG).
-* **Alt Logo Support**: Easily upload and manage alternate logos for any team.
+* **Alt Logo Support**: Easily upload and manage alternate logos for any team. Upload local files or fetch images via URL (supports PNG and SVG)
 * **Emulator Control**: Launch, stop, and toggle the emulator window directly from the web browser.
 * **Smart Configuration**: Automatically manages default values and maintains a rolling history of the last 5 configuration backups.
 
