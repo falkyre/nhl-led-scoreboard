@@ -1,5 +1,7 @@
 import sys
 import runpy
+import json
+import os
 import numpy as np
 import atexit
 import argparse
@@ -7,6 +9,50 @@ import threading
 import time
 import random
 import math
+
+def check_hardware():
+    try:
+        with open("/proc/device-tree/model", "r") as f:
+            model = f.read().strip()
+            if "Raspberry Pi 5" not in model:
+                print(f"[Pi5 Bridge] Error: This launcher is intended for Raspberry Pi 5 only.")
+                print(f"[Pi5 Bridge] Detected Hardware: {model}")
+                sys.exit(1)
+    except FileNotFoundError:
+        print("[Pi5 Bridge] Error: Could not determine hardware model (not running on Raspberry Pi?).")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[Pi5 Bridge] Error checking hardware: {e}")
+        sys.exit(1)
+
+def check_emulator_config():
+    try:
+        # Resolves to ../emulator_config.json relative to this script (src/pi5_launcher.py)
+        # Using abspath for safety
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(base_dir, "emulator_config.json")
+        
+        with open(config_path, "r") as f:
+            data = json.load(f)
+            adapter = data.get("display_adapter")
+            
+            if adapter != "raw":
+                print(f"[Pi5 Bridge] Error: 'display_adapter' in emulator_config.json is set to '{adapter}'.")
+                print(f"[Pi5 Bridge] Please change it to 'raw' to use this launcher.")
+                sys.exit(1)
+                
+    except FileNotFoundError:
+        print(f"[Pi5 Bridge] Error: Could not find emulator_config.json at {config_path}")
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"[Pi5 Bridge] Error: emulator_config.json is not valid JSON.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[Pi5 Bridge] Error checking config: {e}")
+        sys.exit(1)
+
+check_hardware()
+check_emulator_config()
 
 # 1. Import Target Library
 import RGBMatrixEmulator
