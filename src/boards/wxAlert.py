@@ -25,8 +25,6 @@ class wxAlert:
 
         if self.sleepEvent.is_set():
             self.sleepEvent.clear()
-        else:
-            self.scroll = False
 
         self.wxfont = data.config.layout.wxalert_font
 
