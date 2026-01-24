@@ -399,18 +399,19 @@
                 <label style="font-size:0.8em; color:#aaa; margin-bottom:5px;">Team Colors</label>
                 <div class="row" style="margin-bottom:5px;">
                     <div style="display:flex; align-items:center; gap:5px; flex:1;">
-                        <input type="color" id="colPrimary"
+                        <input type="color" id="colPrimary" oninput="enableSaveColors()"
                             style="width:30px; height:30px; padding:0; border:none; cursor:pointer;"
                             title="Primary Color">
                         <span style="font-size:0.7em; color:#888;">Primary</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:5px; flex:1;">
-                        <input type="color" id="colText"
+                        <input type="color" id="colText" oninput="enableSaveColors()"
                             style="width:30px; height:30px; padding:0; border:none; cursor:pointer;" title="Text Color">
                         <span style="font-size:0.7em; color:#888;">Text</span>
                     </div>
                 </div>
-                <button onclick="saveColors()" style="width:100%; font-size:0.8em; padding:4px;">Save Colors</button>
+                <button id="btnSaveColors" onclick="saveColors()" disabled
+                    style="width:100%; font-size:0.8em; padding:4px;">Save Colors</button>
             </div>
         </div>
         <div class="row">
@@ -592,6 +593,9 @@
             document.getElementById('simStopAtEnd').addEventListener('change', saveState);
 
             document.getElementById('altUploadInput').addEventListener('change', handleAltUpload);
+
+            // Explicitly disable save button on load
+            document.getElementById('btnSaveColors').disabled = true;
         });
 
         function triggerAltUpload() {
@@ -777,6 +781,7 @@
                         const hex = rgbToHex(c.text.r, c.text.g, c.text.b);
                         document.getElementById('colText').value = hex;
                     }
+                    document.getElementById('btnSaveColors').setAttribute('disabled', 'true');
                 })
                 .catch(err => console.error(err));
         }
@@ -812,6 +817,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         showStatus("Colors saved!", "lime");
+                        document.getElementById('btnSaveColors').setAttribute('disabled', 'true');
                     } else {
                         alert("Error saving colors: " + data.message);
                     }
@@ -822,6 +828,10 @@
         function handleTeamChange() {
             loadColors();
             updateUI();
+        }
+
+        function enableSaveColors() {
+            document.getElementById('btnSaveColors').removeAttribute('disabled');
         }
 
         function showStatus(msg, color) {

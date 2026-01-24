@@ -11,6 +11,7 @@ A web-based WYSIWYG (What You See Is What You Get) editor for positioning, sizin
 * **Alt Logo Support**: Easily upload and manage alternate logos for any team. Upload local files or fetch images via URL (supports PNG and SVG)
 * **Emulator Control**: Launch, stop, and toggle the emulator window directly from the web browser.
 * **Smart Configuration**: Automatically manages default values and maintains a rolling history of the last 5 configuration backups.
+* **Team Colors**: Customize team primary and text colors directly from the UI, with changes persisted to `teams.json`.
 
 ---
 
@@ -78,6 +79,7 @@ python3 logo_editor.py --port 8080 --dir /opt/nhl-led-scoreboard --venv /opt/my_
 * **Matrix Size:** Select the resolution of your board (e.g., 64x32). This resizes the editor grid and automatically loads the corresponding `logos_WxH.json` file.
 * **Config File:** Shows the currently loaded JSON file.
 * **Team:** Select the team logo you wish to edit. Use the dropdown to select specific teams or their **ALT** variants.
+* **Team Colors:** Click the color pickers to adjust the **Primary** and **Text** colors for the selected team. Don't forget to click "Save Colors" to persist changes.
 * **Stance:** Select **Home** (Left) or **Away** (Right).
 * **Opponent (Visual Only):** Select a second team to render on the opposite side. This helps visualize spacing.
 * **Show Gradient Layer:** Toggles the background gradient asset to ensure logos blend correctly.
