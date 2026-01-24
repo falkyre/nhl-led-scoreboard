@@ -384,7 +384,7 @@
         <hr style="border-color:#444; width:100%">
         <div>
             <label style="color:var(--accent)">Main Team (Editing)</label>
-            <select id="teamSelect" onchange="updateUI()"></select>
+            <select id="teamSelect" onchange="handleTeamChange()"></select>
             <div style="margin-top:5px; display:flex; gap:5px;">
                 <button id="btnUploadFile" onclick="triggerAltUpload()"
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
@@ -393,6 +393,24 @@
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
                     from URL</button>
                 <input type="file" id="altUploadInput" accept="image/*" style="display:none">
+            </div>
+            <!-- COLOR EDITING -->
+            <div style="margin-top:10px; background:#222; padding:8px; border-radius:4px; border:1px solid #333;">
+                <label style="font-size:0.8em; color:#aaa; margin-bottom:5px;">Team Colors</label>
+                <div class="row" style="margin-bottom:5px;">
+                    <div style="display:flex; align-items:center; gap:5px; flex:1;">
+                        <input type="color" id="colPrimary"
+                            style="width:30px; height:30px; padding:0; border:none; cursor:pointer;"
+                            title="Primary Color">
+                        <span style="font-size:0.7em; color:#888;">Primary</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:5px; flex:1;">
+                        <input type="color" id="colText"
+                            style="width:30px; height:30px; padding:0; border:none; cursor:pointer;" title="Text Color">
+                        <span style="font-size:0.7em; color:#888;">Text</span>
+                    </div>
+                </div>
+                <button onclick="saveColors()" style="width:100%; font-size:0.8em; padding:4px;">Save Colors</button>
             </div>
         </div>
         <div class="row">
@@ -714,9 +732,103 @@
                         window.restoreStance = null;
                     }
 
+                    loadColors(); // Load colors AFTER restoring selection
                     updateUI();
                 })
                 .catch(err => console.error("Config load failed", err));
+        }
+
+        // --- COLOR LOGIC ---
+
+        function componentToHex(c) {
+            var hex = c.toString(16);
+            return hex.length == 1 ? "0" + hex : hex;
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+        }
+
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function loadColors() {
+            const team = document.getElementById('teamSelect').value;
+            if (!team) return;
+
+            fetch(`/api/colors?team=${encodeURIComponent(team)}`)
+                .then(r => r.json())
+                .then(c => {
+                    if (c.error) {
+                        console.error("Color load error", c.error);
+                        return;
+                    }
+                    if (c.primary) {
+                        const hex = rgbToHex(c.primary.r, c.primary.g, c.primary.b);
+                        document.getElementById('colPrimary').value = hex;
+                    }
+                    if (c.text) {
+                        const hex = rgbToHex(c.text.r, c.text.g, c.text.b);
+                        document.getElementById('colText').value = hex;
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+
+        function saveColors() {
+            const team = document.getElementById('teamSelect').value;
+            if (!team) {
+                alert("No team selected");
+                return;
+            }
+
+            const pVal = document.getElementById('colPrimary').value;
+            const tVal = document.getElementById('colText').value;
+
+            const pRGB = hexToRgb(pVal);
+            const tRGB = hexToRgb(tVal);
+
+            if (!pRGB || !tRGB) {
+                alert("Invalid color selection");
+                return;
+            }
+
+            fetch('/api/colors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    team: team,
+                    primary: pRGB,
+                    text: tRGB
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showStatus("Colors saved!", "lime");
+                    } else {
+                        alert("Error saving colors: " + data.message);
+                    }
+                })
+                .catch(err => alert("Error: " + err));
+        }
+
+        function handleTeamChange() {
+            loadColors();
+            updateUI();
+        }
+
+        function showStatus(msg, color) {
+            const div = document.getElementById('statusMsg');
+            div.style.color = color || '#green';
+            div.innerText = msg;
+            setTimeout(() => { div.innerText = ''; }, 3000);
         }
 
 

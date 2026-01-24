@@ -30,6 +30,8 @@ args, unknown = parser.parse_known_args()
 INSTALL_DIR = os.path.abspath(args.dir)
 CONFIG_DIR = os.path.join(INSTALL_DIR, 'config', 'layout')
 ASSETS_DIR = os.path.join(INSTALL_DIR, 'assets')
+DATA_DIR = os.path.join(INSTALL_DIR, 'src', 'data')
+COLORS_FILE = os.path.join(INSTALL_DIR, 'config', 'colors', 'teams.json')
 EMULATOR_CONFIG_PATH = os.path.join(INSTALL_DIR, 'emulator_config.json')
 
 # --- ENVIRONMENT DETECTION LOGIC ---
@@ -69,6 +71,20 @@ app = Flask(__name__, template_folder='templates')
 
 emulator_process = None
 current_layout = {"w": 64, "h": 32} 
+
+# --- TEAM DATA LOADING ---
+TEAM_MAPPING = {} # triCode -> ID
+try:
+    with open(os.path.join(DATA_DIR, 'backup_teams_data.json'), 'r') as f:
+        data = json.load(f)
+        for team in data.get('data', []):
+            code = team.get('triCode')
+            tid = team.get('id')
+            if code and tid:
+                TEAM_MAPPING[code] = str(tid)
+    print(f"[Backend] Loaded {len(TEAM_MAPPING)} teams into mapping.")
+except Exception as e:
+    print(f"[Backend] Error loading team data: {e}") 
 
 TEAMS = [
     "ANA", "BOS", "BUF", "CGY", "CAR", "CHI", "COL", "CBJ", "DAL", "DET",
@@ -436,6 +452,77 @@ def handle_config(filename):
             new_data = request.json
             with open(file_path, 'w') as f:
                 json.dump(new_data, f, indent=2)
+            return jsonify({"status": "success"})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/colors', methods=['GET', 'POST'])
+def handle_colors():
+    if request.method == 'GET':
+        team = request.args.get('team')
+        if not team:
+            return jsonify({"error": "Missing team"}), 400
+        
+        # Clean team code
+        if '|' in team:
+            team = team.split('|')[0]
+            
+        tid = TEAM_MAPPING.get(team)
+        if not tid:
+             return jsonify({"error": f"Unknown team code: {team}"}), 404
+             
+        try:
+            if not os.path.exists(COLORS_FILE):
+                return jsonify({"error": "Colors file not found"}), 404
+                
+            with open(COLORS_FILE, 'r') as f:
+                colors_data = json.load(f)
+            
+            team_colors = colors_data.get(tid, {})
+            # Return defaults if empty
+            if not team_colors:
+                 return jsonify({"primary": {"r":0,"g":0,"b":0}, "text": {"r":255,"g":255,"b":255}})
+                 
+            return jsonify(team_colors)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    if request.method == 'POST':
+        data = request.json
+        team = data.get('team')
+        primary = data.get('primary') # {r,g,b}
+        text = data.get('text')       # {r,g,b}
+        
+        if not team or not primary or not text:
+            return jsonify({"error": "Missing data"}), 400
+
+        # Clean team code
+        if '|' in team:
+            team = team.split('|')[0]
+
+        tid = TEAM_MAPPING.get(team)
+        if not tid:
+             return jsonify({"error": f"Unknown team code: {team}"}), 404
+        
+        try:
+            # Load existing
+            if os.path.exists(COLORS_FILE):
+                with open(COLORS_FILE, 'r') as f:
+                    colors_data = json.load(f)
+            else:
+                colors_data = {}
+            
+            # Update
+            if tid not in colors_data:
+                colors_data[tid] = {}
+            
+            colors_data[tid]['primary'] = primary
+            colors_data[tid]['text'] = text
+            
+            # Save
+            with open(COLORS_FILE, 'w') as f:
+                json.dump(colors_data, f, indent=4)
+                
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
