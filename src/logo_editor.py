@@ -18,8 +18,8 @@ parser.add_argument('--venv',
                     default=None,
                     help='Path to the virtual environment (default: Detect Active or ~/nhlsb-venv)')
 parser.add_argument('--dir', 
-                    default=os.getcwd(),
-                    help='Path to the scoreboard root directory (default: current working directory)')
+                    default=None,
+                    help='Path to the scoreboard root directory (default: auto-detected)')
 parser.add_argument('--port', 
                     default=5000,
                     type=int,
@@ -27,7 +27,12 @@ parser.add_argument('--port',
 
 args, unknown = parser.parse_known_args()
 
-INSTALL_DIR = os.path.abspath(args.dir)
+if args.dir:
+    INSTALL_DIR = os.path.abspath(args.dir)
+else:
+    # Use the directory of the script to find the root
+    # Assuming script is in src/logo_editor.py, so root is one level up
+    INSTALL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 CONFIG_DIR = os.path.join(INSTALL_DIR, 'config', 'layout')
 ASSETS_DIR = os.path.join(INSTALL_DIR, 'assets')
 DATA_DIR = os.path.join(INSTALL_DIR, 'src', 'data')
