@@ -192,3 +192,4 @@ emulator_config-pi5.json
 emulator_config.json
 config/layout/logos_128x32.json
 config/layout/logos_128x64.json
+RELEASE_NOTES.md
