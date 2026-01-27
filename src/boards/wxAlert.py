@@ -71,6 +71,13 @@ class wxAlert:
 
             if self.data.config.wxalert_alert_feed.lower() == "nws":
                 top_title = self.data.wx_alerts[4]
+
+                # if the color is black, change it to blue
+                # doing this here to catch all alert types
+                # if we want different colors for different alert types,
+                # this will need to be moved to the alert parsing code
+                if self.data.wx_alerts[5] == (0, 0, 0):
+                    self.data.wx_alerts[5] = (0, 0, 255)  # change white advisory to blue
             else:
                 top_title = "Weather"
 
