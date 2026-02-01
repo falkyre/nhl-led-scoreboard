@@ -374,43 +374,6 @@ def handle_config(filename):
                     try:
                         with open(base_file, 'r') as f:
                             base_data = json.load(f)
-                        
-                        # Inject requested defaults
-                        if 'scoreboard' in base_data and 'logos' in base_data['scoreboard']:
-                            # Clear out existing team data, keeping only _default structure to be overwritten
-                            base_data['scoreboard']['logos'] = {}
-                            
-                            base_data['scoreboard']['logos']['_default'] = {
-                                "zoom": "100%",
-                                "position": [0, 0],
-                                "flip": 0,
-                                "rotate": 0,
-                                "crop": [0, 0, 0, 0],
-                                "home": {
-                                    "zoom": "100%",
-                                    "position": [0, 0],
-                                    "flip": 0,
-                                    "rotate": 0,
-                                    "crop": [0, 0, 0, 0]
-                                },
-                                "away": {
-                                    "zoom": "100%",
-                                    "position": [0, 0],
-                                    "flip": 0,
-                                    "rotate": 0,
-                                    "crop": [0, 0, 0, 0]
-                                }
-                            }
-                        
-                        # Also clean up team_summary logos if present to be consistent
-                        if 'team_summary' in base_data and 'logos' in base_data['team_summary']:
-                             base_data['team_summary']['logos'] = {
-                                 "_default": base_data['team_summary']['logos'].get('_default', {
-                                    "zoom": "100%",
-                                    "position": [0, 0]
-                                 })
-                             }
-
                         return jsonify(base_data)
                     except Exception as e:
                         return jsonify({"status": "error", "message": str(e)}), 500
@@ -434,6 +397,26 @@ def handle_config(filename):
                 for team in TEAMS:
                     if team not in logos:
                         logos[team] = json.loads(json.dumps(default_logo)) # Deep copy
+            
+            # Check for ALT logos on disk and inject if missing in config
+            # Extract resolution from filename (e.g. logos_64x32.json)
+            res_match = re.search(r'logos_(\d+)x(\d+)\.json', filename)
+            if res_match:
+                w, h = int(res_match.group(1)), int(res_match.group(2))
+                for team_key in list(logos.keys()):
+                    if team_key.startswith('_'): continue
+                    
+                    if 'alt' not in logos[team_key]:
+                        # Check disk
+                        alt_path = os.path.join(ASSETS_DIR, 'logos', team_key, 'alt', f"{w}x{h}.png")
+                        if os.path.exists(alt_path):
+                            # Found unconfigured alt logo, inject default config
+                            base = logos[team_key].get('home')
+                            if not base and default_logo:
+                                base = default_logo.get('home')
+                            
+                            if base:
+                                logos[team_key]['alt'] = json.loads(json.dumps(base))
             
         return jsonify(data)
     
