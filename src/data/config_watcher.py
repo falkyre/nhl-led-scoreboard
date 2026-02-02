@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+import fnmatch
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -18,7 +19,13 @@ class ConfigReloadHandler(FileSystemEventHandler):
     def on_modified(self, event):
         # Only react if the file modified is config.json
         config_path = self.scoreboard_config.config_file_path
-        if event.src_path == config_path:
+        filename = os.path.basename(event.src_path)
+
+        # Check if it is config.json or a layout/logo file
+        is_config = event.src_path == config_path
+        is_layout = fnmatch.fnmatch(filename, 'logos*.json') or fnmatch.fnmatch(filename, 'layout*.json')
+
+        if is_config or is_layout:
             debug.info(f"Detected change in {event.src_path}, attempting to reload config...")
             self.scoreboard_config._reload_config()
             self.scheduler_manager.schedule_jobs()
@@ -156,6 +163,13 @@ def start_config_watcher(scoreboard_config, scheduler_manager, thread_manager=No
     event_handler = ConfigReloadHandler(scoreboard_config, scheduler_manager, thread_manager, main_renderer)
     observer = Observer()
     observer.schedule(event_handler, path=config_dir, recursive=False)
+
+    # Also watch the layout directory inside config if it exists
+    layout_dir = os.path.join(config_dir, 'layout')
+    if os.path.exists(layout_dir):
+        observer.schedule(event_handler, path=layout_dir, recursive=False)
+        debug.info(f"Added watchdog for layout directory: {layout_dir}")
+
     thread = threading.Thread(target=observer.start, daemon=True)
     thread.start()
     debug.info(f"Started watchdog thread for {config_path}")

@@ -1,6 +1,6 @@
 [project]
 name = "nhl-led-scoreboard"
-version = "2025.12.2"
+version = "2026.02.0"
 description = "🚨 Display NHL score of your favorite team on a Raspberry Pi driven RGB LED matrix. 🚨"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +27,7 @@ dependencies = [
     "richcolorlog==1.44.12",
     "tzlocal>=5.2",
     "watchdog>=6.0.0",
+    "flask>=3.0.0",
     "rgbmatrixemulator>=0.13.5 ; platform_system != 'Linux'",
 
     # Pi/Linux-only packages:

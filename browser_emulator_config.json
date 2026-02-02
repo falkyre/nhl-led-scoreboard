@@ -1,0 +1,22 @@
+{
+  "pixel_outline": 0,
+  "pixel_size": 12,
+  "pixel_style": "real",
+  "pixel_glow": 6,
+  "display_adapter": "browser",
+  "icon_path": null,
+  "emulator_title": "NHL-LED-SCOREBOARD",
+  "suppress_font_warnings": false,
+  "suppress_adapter_load_errors": true,
+  "browser": {
+    "_comment": "For use with the browser adapter only.",
+    "port": 8888,
+    "target_fps": 24,
+    "fps_display": false,
+    "quality": 70,
+    "image_border": true,
+    "debug_text": false,
+    "image_format": "JPEG"
+  },
+  "log_level": "info"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Score Ticker",
+  "description": "Display rotating ticker of all NHL games for the day",
+  "version": "1.0.0",
+  "author": "NHL LED Scoreboard",
+  "enabled": true,
+  "requirements": {
+    "app_version": ">=2025.01.00"
+  },
+  "boards": [
+    {
+      "id": "scoreticker",
+      "class_name": "Scoreticker",
+      "module": "scoreticker"
+    }
+  ]
+}

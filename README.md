@@ -27,12 +27,13 @@ Click on button to go to release notes.
 * Raspberry Pi Zero 2w
 * Raspberry Pi 3A+, 3B
 * Raspberry Pi 4
+* Raspberry Pi 5 (experimental and best with 128x64 boards)
 ## Only Supported RGB Adapters
 * Adafruit RGB Bonnet or HAT
 * Adafruit Triple LED Matrix Bonnet
 * [Electrodragon RGB Matrix Panel Drive board](https://www.electrodragon.com/product/rgb-matrix-panel-drive-board-for-raspberry-pi-v2/)
 ## Only Supported OS (these have been tested)
-* rpi OS Bookworm (32 bit only, 64 bit not tested) or higher (Trixie 32 bit or 64 bit) - **lite vesion only**
+* rpi OS Bookworm (32 bit only, 64 bit not tested) or higher (Trixie 32 bit or 64 bit) - **lite version only**
 > [!NOTE]
 > If you get a segmentation fault on using apt to install packages, reboot your pi and try again.  There maybe some locked files
 * Dietpi V9.9.0 or higher (dietpi V9.17.2 is Debian trixie and the board has been tested under this OS)

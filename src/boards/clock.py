@@ -152,18 +152,18 @@ class Clock:
                     if self.data.config.wxalert_alert_feed.lower() == "nws":
                         self.matrix.draw.rectangle([self.matrix.width -7, self.matrix.height -7 , self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[5]) # warning
                     else:
-                        self.matrix.draw.rectangle([self.matrix.width -7, self.matrix.height -7 , self.matrix.width, self.matrix.height], fill=(255,0,0)) # warning
+                        self.matrix.draw.rectangle([self.matrix.width -7, self.matrix.height -7 , self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[3]) # warning
                 elif self.data.wx_alerts[1] == "watch":
                     if self.data.config.wxalert_alert_feed.lower() == "nws":
                         self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height -7 , self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[5]) # watch
                     else:
-                        self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height - 7, self.matrix.width, self.matrix.height], fill=(255,255,0)) # watch canada
+                        self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height - 7, self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[3]) # watch canada
                 else:
                     if self.data.wx_alerts[1] == "advisory":
                         if self.data.config.wxalert_alert_feed.lower() == "nws":
                             self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height - 7 , self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[5]) #advisory
                         else:
-                            self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height - 7, self.matrix.width, self.matrix.height], fill=(169,169,169)) #advisory canada
+                            self.matrix.draw.rectangle([self.matrix.width - 7, self.matrix.height - 7, self.matrix.width, self.matrix.height], fill=self.data.wx_alerts[3]) #advisory canada
 
         self.matrix.render()
         if self.data.network_issues and not self.data.config.clock_hide_indicators:

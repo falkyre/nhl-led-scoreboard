@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Service 1: The Scoreboard
+  nhl-led-scoreboard:
+    image: ghcr.io/falkyre/nhl-led-scoreboard:latest
+    container_name: nhl-led-scoreboard
+    command: 
+      - "--led-rows=64"
+      - "--led-cols=128"
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - TZ=America/Winnipeg
+    ports:
+      - "8888:8888"
+    volumes:
+      - './config/config.json:/app/config/config.json'
+      - './src/boards/plugins:/app/src/boards/plugins'
+      - plugin_libs:/home/appuser/.local
+    restart: unless-stopped
+
+  # Service 2: The Config Hub
+  nls-control-hub:
+    image: ghcr.io/falkyre/nls-control-hub:latest
+    container_name: nsl-control-hub
+    # We tell the Hub to look for files in /scoreboard (mapped below)
+    command: ["--scoreboard_dir", "/scoreboard"]
+    environment:
+      - TZ=America/Winnipeg
+    ports:
+      - "8000:8000"
+    volumes:
+      # 1. Map project root to /scoreboard so Hub can SEE the files
+      - .:/scoreboard
+      
+      # 2. Map Docker Socket so Hub can EXECUTE commands in the other container
+      #    This is the key to "using the scoreboard's python"
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  plugin_libs:

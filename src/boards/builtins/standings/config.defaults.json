@@ -1,0 +1,11 @@
+{
+  "standing_type": "division",
+  "preferred_standings_only": false,
+  "preferred_conference": "eastern",
+  "preferred_divisions": "metropolitan",
+  "wildcard_limit": 8,
+  "standings_large_font": false,
+  "scroll_speed": 0.07,
+  "rotation_rate": 5,
+  "enabled": true
+}

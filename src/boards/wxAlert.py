@@ -19,15 +19,12 @@ class wxAlert:
         self.data = data
         self.layout4 = self.data.config.config.layout.get_board_layout("wx_alert")
         self.matrix = matrix
-        self.pos = self.matrix.width
         self.banner_height = 8
         self.sleepEvent = sleepEvent
         self.scroll = self.data.config.wxalert_scroll_alert
 
         if self.sleepEvent.is_set():
             self.sleepEvent.clear()
-        else:
-            self.scroll = False
 
         self.wxfont = data.config.layout.wxalert_font
 
@@ -44,6 +41,7 @@ class wxAlert:
             # Set the width, add 3 to allow for text to scroll completely off screen
             self.alert_width = alert_info["size"][0] + 3
             debug.debug("Alert width: {0}".format(self.alert_width))
+            self.pos = self.matrix.width
 
             if self.alert_width < self.pos:
                 self.alert_width = self.pos + 1
@@ -73,6 +71,13 @@ class wxAlert:
 
             if self.data.config.wxalert_alert_feed.lower() == "nws":
                 top_title = self.data.wx_alerts[4]
+
+                # if the color is black, change it to blue
+                # doing this here to catch all alert types
+                # if we want different colors for different alert types,
+                # this will need to be moved to the alert parsing code
+                if self.data.wx_alerts[5] == (0, 0, 0):
+                    self.data.wx_alerts[5] = (0, 0, 255)  # change white advisory to blue
             else:
                 top_title = "Weather"
 

@@ -72,8 +72,8 @@ class ScoreboardConfig:
                 self.mqtt_main_topic = "scoreboard"
 
             try:
-                self.mqtt_username = json["mqtt"]["auth"]["username"]
-                self.mqtt_password = json["mqtt"]["auth"]["password"]
+                self.mqtt_username = json["sbio"]["mqtt"]["auth"]["username"]
+                self.mqtt_password = json["sbio"]["mqtt"]["auth"]["password"]
             except KeyError:
                 pass
 
@@ -158,19 +158,15 @@ class ScoreboardConfig:
             self.seriesticker_hide_completed_rounds = False
 
         # Standings
-        self.preferred_standings_only = json["boards"]["standings"]["preferred_standings_only"]
-        self.standing_type = json["boards"]["standings"]["standing_type"]
-        self.preferred_divisions = json["boards"]["standings"]["divisions"]
-        self.preferred_conference = json["boards"]["standings"]["conference"]
-        try:
-            self.wildcard_limit = json["boards"]["standings"]["wildcard_limit"]
-        except KeyError:
-            self.wildcard_limit = 4
-
-        try:
-            self.standings_large_font = json["boards"]["standings"]["large_font"]
-        except KeyError:
-            self.standings_large_font = False
+        standings = json["boards"].get("standings", {})
+        self.standings_preferred_standings_only = standings.get("preferred_standings_only", False)
+        self.standings_standing_type = standings.get("standing_type", "division")
+        self.standings_preferred_divisions = standings.get("divisions", "metropolitan")
+        self.standings_preferred_conference = standings.get("conference", "eastern")
+        self.standings_wildcard_limit = standings.get("wildcard_limit", 4)
+        self.standings_standings_large_font = standings.get("large_font", False)
+        self.standings_scroll_speed = standings.get("scroll_speed", 0.7)
+        self.standings_rotation_rate = standings.get("rotation_rate", 5)
 
         # Player Stats
         try:
