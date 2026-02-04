@@ -26,6 +26,9 @@ class ScoreboardConfig:
         self._load_attributes(json_data)
 
     def _load_attributes(self, json):
+        # Store raw boards config for per-key presence checks in get_config_value
+        self._boards_raw = json.get("boards", {})
+
         self.testing_mode = False
         self.test_goal_animation = False
         self.testScChampions = False
@@ -145,9 +148,8 @@ class ScoreboardConfig:
         self.boards_post_game = json["states"]["post_game"]
 
         # Boards configuration
-        # Scoreticker
+        # Scoreticker (preferred_teams_only used by data.py for game filtering)
         self.preferred_teams_only = json["boards"]["scoreticker"]["preferred_teams_only"]
-        self.scoreticker_rotation_rate = json["boards"]["scoreticker"]["rotation_rate"]
 
         # Seriesticker
         self.seriesticker_preferred_teams_only = json["boards"]["seriesticker"]["preferred_teams_only"]
@@ -157,17 +159,6 @@ class ScoreboardConfig:
         except KeyError:
             self.seriesticker_hide_completed_rounds = False
 
-        # Standings
-        standings = json["boards"].get("standings", {})
-        self.standings_preferred_standings_only = standings.get("preferred_standings_only", False)
-        self.standings_standing_type = standings.get("standing_type", "division")
-        self.standings_preferred_divisions = standings.get("divisions", "metropolitan")
-        self.standings_preferred_conference = standings.get("conference", "eastern")
-        self.standings_wildcard_limit = standings.get("wildcard_limit", 4)
-        self.standings_standings_large_font = standings.get("large_font", False)
-        self.standings_scroll_speed = standings.get("scroll_speed", 0.7)
-        self.standings_rotation_rate = standings.get("rotation_rate", 5)
-
         # Player Stats
         try:
             self.player_stats_rotation_rate = json["boards"]["player_stats"]["rotation_rate"]
@@ -175,13 +166,6 @@ class ScoreboardConfig:
         except KeyError:
             pass
 
-        # Stats Leaders
-        stats_leaders = json["boards"].get("stats_leaders", {})
-        self.stats_leaders_rotation_rate = stats_leaders.get("rotation_rate", 5)
-        self.stats_leaders_categories = stats_leaders.get("categories", ["goals", "assists", "points"])
-        self.stats_leaders_use_large_font = stats_leaders.get("use_large_font", True)
-        self.stats_leaders_scroll_speed = stats_leaders.get("scroll_speed", 0.2)
-        self.stats_leaders_limit = stats_leaders.get("limit", 10)
 
         # Clock
         self.clock_board_duration = json["boards"]["clock"]["duration"]

@@ -28,12 +28,12 @@ class StatsLeadersBoard(BoardBase):
         # Load config with automatic priority: central config -> board config -> defaults
         self.enabled_categories = self.get_config_value('categories', ['goals', 'assists', 'points'])
         self.rotation_rate = self.get_config_value('rotation_rate', 5)
-        self.use_large_font = self.get_config_value('use_large_font', False)
+        self.large_font = self.get_config_value('large_font', False)
         self.scroll_speed = self.get_config_value('scroll_speed', 0.2)
         self.limit = self.get_config_value('limit', 10)
 
         # Set font and sizing based on use_large_font config
-        if self.use_large_font and self.matrix.width >= 128:
+        if self.large_font and self.matrix.width >= 128:
             self.font = data.config.layout.font_large
             self.font_height = 13
             self.width_multiplier = 2
