@@ -58,7 +58,7 @@ class TeamScheduleWorker(BaseWorker[Dict[int, TeamScheduleData]]):
             return None
 
         schedules: Dict[int, TeamScheduleData] = {}
-        today = str(date.today())
+        today = str(self.data.date())
 
         for team_id in pref_teams:
             try:
