@@ -38,13 +38,11 @@ class StatsLeadersBoard(BoardBase):
             self.font_height = 13
             self.width_multiplier = 2
             self.last_name_offset = -1
-            self.last_name_max_len = 11
         else:
             self.font = data.config.layout.font
             self.font_height = 7
             self.width_multiplier = 1
             self.last_name_offset = 0
-            self.last_name_max_len = 9
 
         # Dictionary mapping API categories to display names
         self.categories = {
@@ -145,7 +143,7 @@ class StatsLeadersBoard(BoardBase):
         # Draw each player's stats
         for idx, player in enumerate(leaders_data):
             # Get player info from structured data
-            last_name = player.last_name[:self.last_name_max_len]
+            last_name = player.last_name
             abbrev = player.team_abbrev
             # Format TOI as MM:SS, otherwise use raw value
             if category == 'toi':
@@ -178,9 +176,15 @@ class StatsLeadersBoard(BoardBase):
                      fill=(txt_color['r'], txt_color['g'], txt_color['b']),
                      font=self.font)
 
-            # Right-align stat count (white)
+            # Right-align stat count (white) with black background overlay
             stat_width = self.font.getlength(stat)
-            draw.text((width - stat_width - (1 * self.width_multiplier), row_pos), stat, font=self.font)
+            stat_x = width - stat_width - (1 * self.width_multiplier)
+            # Draw black background with 1px left padding for visual separation
+            draw.rectangle(
+                [stat_x - 1, row_pos, width, row_pos + row_height - 1],
+                fill=(0, 0, 0)
+            )
+            draw.text((stat_x, row_pos), stat, font=self.font)
 
             row_pos += row_height
 
