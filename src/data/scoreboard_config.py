@@ -39,7 +39,7 @@ class ScoreboardConfig:
         self.live_mode = json["live_mode"]
 
         # Preferences
-        self.end_of_day = json["preferences"]["end_of_day"]
+        self.end_of_day = json["preferences"].get("end_of_day", "03:00")
         self.time_format = self.__get_time_format(json["preferences"]["time_format"])
         self.location = json["preferences"]["location"]
 
