@@ -5,7 +5,7 @@
   "divisions": "metropolitan",
   "wildcard_limit": 8,
   "large_font": true,
-  "scroll_speed": 0.07,
+  "scroll_speed": 0.12,
   "rotation_rate": 5,
   "enabled": true
 }
