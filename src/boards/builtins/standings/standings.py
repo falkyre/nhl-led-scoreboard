@@ -28,10 +28,10 @@ class StandingsBoard(BoardBase):
         # Load config with automatic priority: central config -> board config -> defaults
         self.standing_type = self.get_config_value('standing_type', 'division')
         self.preferred_standings_only = self.get_config_value('preferred_standings_only', False)
-        self.preferred_conference = self.get_config_value('preferred_conference', 'eastern')
-        self.preferred_divisions = self.get_config_value('preferred_divisions', 'metropolitan')
+        self.preferred_conference = self.get_config_value('conference', 'eastern')
+        self.preferred_divisions = self.get_config_value('divisions', 'metropolitan')
         self.wildcard_limit = self.get_config_value('wildcard_limit', 8)
-        self.use_large_font = self.get_config_value('standings_large_font', False)
+        self.use_large_font = self.get_config_value('large_font', False)
         self.scroll_speed = self.get_config_value('scroll_speed', 0.2)
         self.rotation_rate = self.get_config_value('rotation_rate', 5)
 
