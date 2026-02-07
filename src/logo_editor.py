@@ -203,6 +203,11 @@ def get_schedule():
     return jsonify({"games": games})
 
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok"})
+
+
 @app.route('/api/emulator/check_ready', methods=['GET'])
 def emulator_check_ready():
     # Read port from config or default
@@ -729,5 +734,5 @@ def serve_assets(filename):
 if __name__ == '__main__':
     if not os.path.exists('templates'):
         os.makedirs('templates')
-    print(f"Starting Editor on http://localhost:{args.port}")
-    app.run(port=args.port, debug=True)
+    print(f"Starting Editor on http://0.0.0.0:{args.port}")
+    app.run(host='0.0.0.0', port=args.port, debug=True)
