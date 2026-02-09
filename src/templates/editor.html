@@ -203,6 +203,14 @@
             filter: brightness(1.1);
         }
 
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            opacity: 0.5;
+            filter: none;
+        }
+
         button.secondary {
             background: #555;
         }
@@ -385,11 +393,18 @@
         <div>
             <label style="color:var(--accent)">Main Team (Editing)</label>
             <select id="teamSelect" onchange="handleTeamChange()"></select>
+
+            <div class="checkbox-row" style="margin-top: 5px; padding: 5px;">
+                <input type="checkbox" id="useAltLogo" onchange="toggleAltButtons()">
+                <label for="useAltLogo" style="margin:0; font-weight:normal; font-size:0.8em;">Use Alternative
+                    Logo</label>
+            </div>
+
             <div style="margin-top:5px; display:flex; gap:5px;">
-                <button id="btnUploadFile" onclick="triggerAltUpload()"
+                <button id="btnUploadFile" onclick="triggerAltUpload()" disabled
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
                     File</button>
-                <button id="btnUploadUrl" onclick="triggerAltUrlUpload()"
+                <button id="btnUploadUrl" onclick="triggerAltUrlUpload()" disabled
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
                     from URL</button>
                 <input type="file" id="altUploadInput" accept="image/*" style="display:none">
@@ -614,6 +629,52 @@
             uploadAltData(team, null, url);
         }
 
+        function toggleAltButtons() {
+            const chk = document.getElementById('useAltLogo');
+            const btnFile = document.getElementById('btnUploadFile');
+            const btnUrl = document.getElementById('btnUploadUrl');
+            const sel = document.getElementById('teamSelect');
+            const currentVal = sel.value;
+
+            // If checked: Try to switch to ALT
+            if (chk.checked) {
+                if (!currentVal.includes('|alt')) {
+                    const altVal = currentVal + '|alt';
+                    // Check if alt exists in options
+                    let found = false;
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].value === altVal) {
+                            sel.value = altVal;
+                            found = true;
+                            handleTeamChange(); // Updates UI and keeps checkbox checked
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        alert(`There is no Alternative Logo for ${currentVal}, use one of the two buttons to upload one.`);
+                        // Keep buttons enabled so user can upload
+                        btnFile.disabled = false;
+                        btnUrl.disabled = false;
+                    }
+                } else {
+                    // Already on alt, just ensure buttons enabled
+                    btnFile.disabled = false;
+                    btnUrl.disabled = false;
+                }
+            } else {
+                // Unchecked: Switch back to MAIN if currently on ALT
+                if (currentVal.includes('|alt')) {
+                    const mainVal = currentVal.split('|')[0];
+                    sel.value = mainVal;
+                    handleTeamChange(); // Updates UI and unchecks box
+                } else {
+                    // Already on main, just disable buttons
+                    btnFile.disabled = true;
+                    btnUrl.disabled = true;
+                }
+            }
+        }
+
         function handleAltUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -826,6 +887,43 @@
         }
 
         function handleTeamChange() {
+            const sel = document.getElementById('teamSelect');
+            const val = sel.value;
+            const chk = document.getElementById('useAltLogo');
+            const btnFile = document.getElementById('btnUploadFile');
+            const btnUrl = document.getElementById('btnUploadUrl');
+
+            // Sync Checkbox with Selection
+            if (val.includes('|alt')) {
+                chk.checked = true;
+                btnFile.disabled = false;
+                btnUrl.disabled = false;
+            } else {
+                // If we are just switching teams normally (not via toggleAltButtons "new creation" path),
+                // we should reset the checkbox.
+                // However, toggleAltButtons might have JUST set the checkbox to true for a team WITHOUT an alt logo.
+                // In that case, handleTeamChange isn't called by the select change (user didn't change select),
+                // but we might call it manually?
+                // Actually, if user changes dropdown manually to a non-alt team, we want to uncheck.
+                // If toggleAltButtons calls handleTeamChange, it might be an issue?
+                // Wait, toggleAltButtons only calls handleTeamChange if it SUCCESSFULLY switches.
+                // To support "creating new alt", we only uncheck if the user MANUALLY switched to a non-alt team.
+                // But handleTeamChange is called by toggleAltButtons too. 
+                // However, toggleAltButtons only calls this if it successfully switches to an alt team.
+                // If we are on "ANA", check box -> toggleAltButtons -> alert -> no switch -> handleTeamChange NOT called.
+                // So chk stays checked, buttons enabled. Correct.
+                // If we are on "ANA", check box -> toggleAltButtons -> switch to "ANA|alt" -> handleTeamChange called.
+                // val has |alt, so chk=true. Correct.
+                // If we are on "ANA|alt", uncheck box -> toggleAltButtons -> switch to "ANA" -> handleTeamChange called.
+                // val has no |alt, so chk=false. Correct.
+                // If we are on "ANA", manually switch to "BOS". handleTeamChange called.
+                // val has no |alt, so chk=false. Correct.
+
+                chk.checked = false;
+                btnFile.disabled = true;
+                btnUrl.disabled = true;
+            }
+
             loadColors();
             updateUI();
         }
@@ -1448,8 +1546,8 @@
             // Update Tooltips
             if (team1Val) {
                 const cleanName = team1Val.split('|')[0];
-                document.getElementById('btnUploadFile').title = `Upload local file for ${cleanName}`;
-                document.getElementById('btnUploadUrl').title = `Download Logo from URL for ${cleanName}`;
+                document.getElementById('btnUploadFile').title = `Upload local file for ${cleanName} Alt logo`;
+                document.getElementById('btnUploadUrl').title = `Download Logo from URL for ${cleanName} Alt logo`;
             }
 
             const getImageSrc = (val) => {
@@ -1655,13 +1753,43 @@
                 .then(r => r.json())
                 .then(res => {
                     if (res.status === 'success') {
-                        status.innerText = "Saved!";
-                        status.style.color = "#00ff00";
+                        // Also save the logo selection (Alt vs Light)
+                        const chk = document.getElementById('useAltLogo');
+                        let cleanTeam = teamVal;
+                        if (cleanTeam.includes('|')) cleanTeam = cleanTeam.split('|')[0];
+
+                        const logoType = chk.checked ? 'alt' : 'light';
+
+                        fetch('/api/logo_selection', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ team: cleanTeam, type: logoType })
+                        })
+                            .then(r2 => r2.json())
+                            .then(res2 => {
+                                if (res2.status === 'success') {
+                                    status.innerText = "Saved!";
+                                    status.style.color = "#00ff00";
+                                } else {
+                                    console.error("Failed to save selection", res2);
+                                    status.innerText = "Saved Config (Selection Error)";
+                                    status.style.color = "#ffaa00";
+                                }
+                            })
+                            .catch(err2 => {
+                                console.error("Failed to save selection", err2);
+                                status.innerText = "Saved Config (Selection Error)";
+                                status.style.color = "#ffaa00";
+                            })
+                            .finally(() => {
+                                setTimeout(() => status.innerText = "", 3000);
+                            });
+
                     } else {
                         status.innerText = "Error: " + (res.message || "Unknown");
                         status.style.color = "#ff4444";
+                        setTimeout(() => status.innerText = "", 3000);
                     }
-                    setTimeout(() => status.innerText = "", 3000);
                 });
         }
 

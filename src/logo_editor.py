@@ -673,6 +673,47 @@ def upload_alt_logo():
         print(f"Upload error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/logo_selection', methods=['POST'])
+def save_logo_selection():
+    try:
+        data = request.json
+        team = data.get('team')
+        logo_type = data.get('type') # 'alt' or 'light'
+
+        if not team or not logo_type:
+            return jsonify({"status": "error", "message": "Missing team or logo type"}), 400
+
+        # Clean team code if it comes in with suffix (though frontend should handle this)
+        if '|' in team:
+            team = team.split('|')[0]
+
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        
+        logos_data = {}
+        if os.path.exists(logos_file_path):
+            with open(logos_file_path, 'r') as f:
+                try:
+                    logos_data = json.load(f)
+                except json.JSONDecodeError:
+                    logos_data = {}
+        
+        # Ensure _default exists if empty file
+        if '_default' not in logos_data:
+            logos_data['_default'] = 'light'
+
+        # Update selection
+        logos_data[team] = logo_type
+
+        # Write back
+        with open(logos_file_path, 'w') as f:
+            json.dump(logos_data, f, indent=2)
+
+        return jsonify({"status": "success"})
+
+    except Exception as e:
+        print(f"Error saving logo selection: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
     full_path = os.path.join(ASSETS_DIR, filename)
