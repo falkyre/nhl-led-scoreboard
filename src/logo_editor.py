@@ -1,4 +1,25 @@
 import os
+import sys
+
+# --- ENVIRONMENT SANITIZATION ---
+# If launched from a frozen PyInstaller app, we might inherit library paths
+# that interfere with this script's execution (causing broken images/logos).
+# We sanitize the environment to ensure a clean slate.
+env_vars_to_clear = [
+    'DYLD_LIBRARY_PATH',  # macOS shared libraries
+    'LD_LIBRARY_PATH',    # Linux shared libraries
+    'PYTHONPATH',         # Python module search path
+    'PYTHONHOME',         # Python standard library path
+    '_MEIPASS2'           # PyInstaller internal path
+]
+
+for var in env_vars_to_clear:
+    if var in os.environ:
+       try:
+            del os.environ[var]
+       except Exception:
+            pass
+
 import json
 import re
 import io
@@ -8,7 +29,6 @@ import shutil
 import datetime
 import subprocess
 import signal
-import sys
 import argparse
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 
