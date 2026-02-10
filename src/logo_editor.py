@@ -748,6 +748,10 @@ def serve_assets(filename):
         w = int(match.group(3))
         h = int(match.group(4))
 
+        # Disable auto-download for 'alt' logos
+        if logo_type == 'alt':
+            return abort(404)
+
         # If height is 32, force use of 64x32 logos (don't download 128x32 etc)
         if h == 32 and w != 64:
             return serve_assets(filename.replace(f"{w}x{h}", "64x32"))
