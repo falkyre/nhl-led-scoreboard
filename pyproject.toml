@@ -21,7 +21,7 @@ dependencies = [
     "noaa-sdk>=0.1.18",
     "packaging>=25.0",
     "paho-mqtt>=2.1.0",
-    "pillow==11.1.0",
+    "pillow==12.1.1",
     "regex>=2020.4.4",
     "rich>=13.9.4",
     "richcolorlog==1.44.12",

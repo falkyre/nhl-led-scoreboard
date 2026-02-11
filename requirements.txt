@@ -11,7 +11,7 @@ regex>=2020.4.4
 APScheduler
 lastversion>=1.1.6
 nameparser>=1.0.6
-pillow==11.1.0
+pillow==12.1.1
 dbus-python
 iso6709
 packaging>=25.0
