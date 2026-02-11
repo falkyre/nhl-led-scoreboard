@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -12,6 +12,7 @@ debug = logging.getLogger("scoreboard")
 class owmWxWorker(object):
     def __init__(self, data, scheduler):
         self.data = data
+        self.scheduler = scheduler
         self.weather_frequency = data.config.weather_update_freq
         self.time_format = data.config.time_format
         self.icons = get_csv("ecIcons_utf8.csv")
@@ -24,7 +25,13 @@ class owmWxWorker(object):
             debug.info("Weather units not set correctly, defaulting to imperial")
             self.data.config.weather_units = "imperial"
 
-        self.getWeather()
+        # Check if we have cached data
+        if sb_cache.get("weather") is None:
+            debug.warning("No weather cache found.  Delaying first OWM call by 15 seconds to prevent API spam in case of crash loop.")
+            run_date = datetime.now() + timedelta(seconds=15)
+            self.scheduler.add_job(self.getWeather, 'date', run_date=run_date, id='owmWeather_startup')
+        else:
+            self.getWeather()
 
     def getWeather(self):
         if self.data.config.weather_units == "metric":
