@@ -808,6 +808,62 @@
             0
           ]
         }
+      },
+      "CAN": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "USA": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "CZE": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "FIN": {
+        "home": { "zoom": "80%", "position": [-8, 3] },
+        "away": { "zoom": "80%", "position": [8, 3] }
+      },
+      "SWE": {
+        "home": { "zoom": "80%", "position": [0, 3] },
+        "away": { "zoom": "80%", "position": [12, 3] }
+      },
+      "GER": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "SVK": {
+        "home": { "zoom": "80%", "position": [-12, 3] },
+        "away": { "zoom": "80%", "position": [12, 3] }
+      },
+      "SUI": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "LAT": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "DEN": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "FRA": {
+        "zoom": "80%", "position": [0, 3],
+        "home": { "zoom": "80%", "position": [0, 0] },
+        "away": { "zoom": "80%", "position": [0, 0] }
+      },
+      "ITA": {
+        "home": { "zoom": "80%", "position": [-12, 3] },
+        "away": { "zoom": "80%", "position": [12, 3] }
       }
     }
   }

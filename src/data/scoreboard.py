@@ -79,7 +79,11 @@ class GameSummaryBoard:
             away_team_name = away_team["name"]["default"]
         elif away_team.get("placeName"):
             away_team_name = away_team["placeName"]["default"]
-        away_abbrev = data.teams_info[away_team_id].details.abbrev
+        try:
+            away_abbrev = data.teams_info[away_team_id].details.abbrev
+        except KeyError:
+            away_abbrev = away_team.get("abbrev", "???")
+            debug.debug("Away team abbrev not found in teams_info for team ID {}. Using fallback abbrev: {}".format(away_team_id, away_abbrev))
 
         # home = linescore.teams.home
         home_team = game_details["homeTeam"]
@@ -88,8 +92,11 @@ class GameSummaryBoard:
             home_team_name = home_team["name"]["default"]
         elif home_team.get("placeName"):
             home_team_name = home_team["placeName"]["default"]
-        home_abbrev = data.teams_info[home_team_id].details.abbrev
-
+        try:
+            home_abbrev = data.teams_info[home_team_id].details.abbrev
+        except KeyError:
+            home_abbrev = home_team.get("abbrev", "???")
+            debug.debug("Home team abbrev not found in teams_info for team ID {}. Using fallback abbrev: {}".format(home_team_id, home_abbrev))
         if game_details["homeTeam"].get("score") or game_details["awayTeam"].get("score"):
             self.away_team = TeamScore(away_team_id, away_abbrev, away_team_name, game_details["awayTeam"]["score"])
             self.home_team = TeamScore(home_team_id, home_abbrev, home_team_name, game_details["homeTeam"]["score"])

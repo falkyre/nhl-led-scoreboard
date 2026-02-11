@@ -14,6 +14,7 @@ gid = int(os.stat("./VERSION").st_uid)
 PATH = 'assets/logos'
 LOCAL_LOGO_URL = PATH+'/_local/{}_{}.svg'
 LOGO_URL = 'https://assets.nhle.com/logos/nhl/svg/{}_{}.svg'
+NTL_LOGO_URL = 'https://assets.nhle.com/logos/ntl/svg/{}_{}.svg'
 
 
 
@@ -82,14 +83,19 @@ class LogoRenderer:
             except OSError as exc: # Guard against race condition
                 if exc.errno != errno.EEXIST:
                     raise
-        try:        
+        try:
             self.logo = ImageHelper.image_from_svg(
                 LOGO_URL.format(team_abbrev, self.logo_variant)
             )
         except:
-            self.logo = ImageHelper.image_from_svg(
-                LOCAL_LOGO_URL.format(team_abbrev, self.logo_variant)
-            )
+            try:
+                self.logo = ImageHelper.image_from_svg(
+                    NTL_LOGO_URL.format(team_abbrev, self.logo_variant)
+                )
+            except:
+                self.logo = ImageHelper.image_from_svg(
+                    LOCAL_LOGO_URL.format(team_abbrev, self.logo_variant)
+                )
 
         self.logo.thumbnail(self.get_size())
         self.logo.save(filename)
