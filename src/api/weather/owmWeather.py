@@ -26,9 +26,26 @@ class owmWxWorker(object):
             self.data.config.weather_units = "imperial"
 
         # Check if we have cached data
-        if sb_cache.get("weather") is None:
-            debug.warning("No weather cache found.  Delaying first OWM call by 15 seconds to prevent API spam in case of crash loop.")
-            run_date = datetime.now() + timedelta(seconds=15)
+        crash_count = sb_cache.get("crash_count", 0)
+        
+        # Calculate backoff if needed (30s * crash count, max 5 mins)
+        backoff_delay = 0
+        if crash_count > 0:
+            backoff_delay = min(30 * crash_count, 300)
+            debug.warning(f"Crash count is {crash_count}. Backing off OWM API calls for {backoff_delay} seconds.")
+
+        # Schedule stability timer to reset crash count after 5 minutes of upregulation
+        stability_date = datetime.now() + timedelta(minutes=5) + timedelta(seconds=backoff_delay)
+        self.scheduler.add_job(self.reset_crash_count, 'date', run_date=stability_date, id='reset_crash_count')
+
+        if sb_cache.get("weather") is None or crash_count > 0:
+            if crash_count == 0:
+                debug.warning("No weather cache found. Delaying first OWM call by 15 seconds to prevent API spam in case of crash loop.")
+                delay = 15
+            else:
+                delay = backoff_delay
+            
+            run_date = datetime.now() + timedelta(seconds=delay)
             self.scheduler.add_job(self.getWeather, 'date', run_date=run_date, id='owmWeather_startup')
         else:
             self.getWeather()
@@ -153,6 +170,10 @@ class owmWxWorker(object):
             debug.info(self.data.wx_current)
             debug.info(self.data.wx_curr_wind)
 
+    def reset_crash_count(self):
+        debug.info("Application has been stable for 5 minutes. Resetting crash count.")
+        sb_cache.delete("crash_count")
+
     def getWeatherIcon(self, wx_code):
         # Map the OpenWeatherMap weather codes to icons
         if wx_code in range(200, 299):
@@ -171,3 +192,4 @@ class owmWxWorker(object):
             return 801  # Few Clouds
         else:
             return wx_code  # Default icon for other conditions
+
