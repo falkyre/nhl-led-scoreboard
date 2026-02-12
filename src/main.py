@@ -162,3 +162,16 @@ if __name__ == "__main__":
         sb_logger.info("Exiting NHL-LED-SCOREBOARD")
         sb_cache.close()
         sys.exit(0)
+    except Exception as e:
+        # Increment crash count
+        crash_count = sb_cache.get("crash_count", 0)
+        sb_cache.set("crash_count", crash_count + 1)
+        
+        # Log the crash to a file
+        from rich.console import Console
+        console = Console(file=open("crash.log", "w"))
+        console.print_exception(show_locals=True)
+        
+        # Re-raise the exception to ensure the program exits with an error code
+        # and to allow systemd/docker to handle the restart
+        raise e

@@ -61,7 +61,7 @@ class GamesWorker(BaseWorker[GamesData]):
 
     def fetch_data(self) -> Optional[GamesData]:
         """Fetch today's games in both raw and structured formats."""
-        date_obj = date.today()
+        date_obj = self.data.date()
 
         # Fetch raw data for backward compatibility with GameSummaryBoard
         raw_data = get_score_details(date_obj)

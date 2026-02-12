@@ -1,4 +1,25 @@
 import os
+import sys
+
+# --- ENVIRONMENT SANITIZATION ---
+# If launched from a frozen PyInstaller app, we might inherit library paths
+# that interfere with this script's execution (causing broken images/logos).
+# We sanitize the environment to ensure a clean slate.
+env_vars_to_clear = [
+    'DYLD_LIBRARY_PATH',  # macOS shared libraries
+    'LD_LIBRARY_PATH',    # Linux shared libraries
+    'PYTHONPATH',         # Python module search path
+    'PYTHONHOME',         # Python standard library path
+    '_MEIPASS2'           # PyInstaller internal path
+]
+
+for var in env_vars_to_clear:
+    if var in os.environ:
+       try:
+            del os.environ[var]
+       except Exception:
+            pass
+
 import json
 import re
 import io
@@ -8,7 +29,6 @@ import shutil
 import datetime
 import subprocess
 import signal
-import sys
 import argparse
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 
@@ -201,6 +221,11 @@ def get_schedule():
     
     games = fetch_team_schedule(team, month)
     return jsonify({"games": games})
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok"})
 
 
 @app.route('/api/emulator/check_ready', methods=['GET'])
@@ -668,6 +693,47 @@ def upload_alt_logo():
         print(f"Upload error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/logo_selection', methods=['POST'])
+def save_logo_selection():
+    try:
+        data = request.json
+        team = data.get('team')
+        logo_type = data.get('type') # 'alt' or 'light'
+
+        if not team or not logo_type:
+            return jsonify({"status": "error", "message": "Missing team or logo type"}), 400
+
+        # Clean team code if it comes in with suffix (though frontend should handle this)
+        if '|' in team:
+            team = team.split('|')[0]
+
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        
+        logos_data = {}
+        if os.path.exists(logos_file_path):
+            with open(logos_file_path, 'r') as f:
+                try:
+                    logos_data = json.load(f)
+                except json.JSONDecodeError:
+                    logos_data = {}
+        
+        # Ensure _default exists if empty file
+        if '_default' not in logos_data:
+            logos_data['_default'] = 'light'
+
+        # Update selection
+        logos_data[team] = logo_type
+
+        # Write back
+        with open(logos_file_path, 'w') as f:
+            json.dump(logos_data, f, indent=2)
+
+        return jsonify({"status": "success"})
+
+    except Exception as e:
+        print(f"Error saving logo selection: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
     full_path = os.path.join(ASSETS_DIR, filename)
@@ -681,6 +747,10 @@ def serve_assets(filename):
         logo_type = match.group(2)
         w = int(match.group(3))
         h = int(match.group(4))
+
+        # Disable auto-download for 'alt' logos
+        if logo_type == 'alt':
+            return abort(404)
 
         # If height is 32, force use of 64x32 logos (don't download 128x32 etc)
         if h == 32 and w != 64:
@@ -729,5 +799,5 @@ def serve_assets(filename):
 if __name__ == '__main__':
     if not os.path.exists('templates'):
         os.makedirs('templates')
-    print(f"Starting Editor on http://localhost:{args.port}")
-    app.run(port=args.port, debug=True)
+    print(f"Starting Editor on http://0.0.0.0:{args.port}")
+    app.run(host='0.0.0.0', port=args.port, debug=True)

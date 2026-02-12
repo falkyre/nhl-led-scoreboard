@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -12,6 +12,7 @@ debug = logging.getLogger("scoreboard")
 class owmWxWorker(object):
     def __init__(self, data, scheduler):
         self.data = data
+        self.scheduler = scheduler
         self.weather_frequency = data.config.weather_update_freq
         self.time_format = data.config.time_format
         self.icons = get_csv("ecIcons_utf8.csv")
@@ -24,7 +25,30 @@ class owmWxWorker(object):
             debug.info("Weather units not set correctly, defaulting to imperial")
             self.data.config.weather_units = "imperial"
 
-        self.getWeather()
+        # Check if we have cached data
+        crash_count = sb_cache.get("crash_count", 0)
+        
+        # Calculate backoff if needed (30s * crash count, max 5 mins)
+        backoff_delay = 0
+        if crash_count > 0:
+            backoff_delay = min(30 * crash_count, 300)
+            debug.warning(f"Crash count is {crash_count}. Backing off OWM API calls for {backoff_delay} seconds.")
+
+        # Schedule stability timer to reset crash count after 5 minutes of upregulation
+        stability_date = datetime.now() + timedelta(minutes=5) + timedelta(seconds=backoff_delay)
+        self.scheduler.add_job(self.reset_crash_count, 'date', run_date=stability_date, id='reset_crash_count')
+
+        if sb_cache.get("weather") is None or crash_count > 0:
+            if crash_count == 0:
+                debug.warning("No weather cache found. Delaying first OWM call by 15 seconds to prevent API spam in case of crash loop.")
+                delay = 15
+            else:
+                delay = backoff_delay
+            
+            run_date = datetime.now() + timedelta(seconds=delay)
+            self.scheduler.add_job(self.getWeather, 'date', run_date=run_date, id='owmWeather_startup')
+        else:
+            self.getWeather()
 
     def getWeather(self):
         if self.data.config.weather_units == "metric":
@@ -146,6 +170,10 @@ class owmWxWorker(object):
             debug.info(self.data.wx_current)
             debug.info(self.data.wx_curr_wind)
 
+    def reset_crash_count(self):
+        debug.info("Application has been stable for 5 minutes. Resetting crash count.")
+        sb_cache.delete("crash_count")
+
     def getWeatherIcon(self, wx_code):
         # Map the OpenWeatherMap weather codes to icons
         if wx_code in range(200, 299):
@@ -164,3 +192,4 @@ class owmWxWorker(object):
             return 801  # Few Clouds
         else:
             return wx_code  # Default icon for other conditions
+

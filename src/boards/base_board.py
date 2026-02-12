@@ -77,8 +77,10 @@ class BoardBase(ABC):
         # Detect display size
         self.display_width, self.display_height = self._detect_display_size()
 
-        # Load board-specific config and layout
-        self.board_config = self._load_board_config()
+        # Load board-specific config sources and layout
+        self._board_defaults, self._board_user_config = self._parse_config_files()
+        # Merged view for backward compatibility with direct board_config access
+        self.board_config = {**self._board_defaults, **self._board_user_config}
         self.board_layout = self._create_board_layout_config()
 
     @abstractmethod
@@ -91,44 +93,51 @@ class BoardBase(ABC):
         """
         pass
 
-    def _load_board_config(self) -> Dict[str, Any]:
+    def _parse_config_files(self) -> tuple:
         """
-        Load board-specific configuration from config.json in the board directory.
+        Parse board configuration files from the board directory.
         Works with both plugins and builtins directories.
 
+        Loads defaults and user config as separate dicts for per-item resolution
+        in get_config_value(). Both builtins and plugins check for config.defaults.json
+        and config.sample.json (defaults takes priority over sample).
+
         Returns:
-            Dict containing board configuration, or empty dict if no config found.
+            Tuple of (defaults_dict, user_config_dict).
         """
+        defaults = {}
+        user_config = {}
+
         try:
-            # Get the module path to determine board location
             board_module = self.__class__.__module__
 
-            # Handle both plugins and builtins (e.g., boards.plugins.name.board or boards.builtins.name.board)
             if '.plugins.' in board_module or '.builtins.' in board_module:
-                # Extract board type and name from module path
                 module_parts = board_module.split('.')
                 if len(module_parts) >= 4:
                     board_type = module_parts[1]  # 'plugins' or 'builtins'
                     board_name = module_parts[2]  # board directory name
+                    board_dir = Path(__file__).parent / board_type / board_name
 
-                    config_path = Path(__file__).parent / board_type / board_name / 'config.json'
-                    config_defaults_path = Path(__file__).parent / board_type / board_name / 'config.defaults.json'
-                    config_sample_path = Path(__file__).parent / board_type / board_name / 'config.sample.json'
+                    config_path = board_dir / 'config.json'
+                    config_defaults_path = board_dir / 'config.defaults.json'
+                    config_sample_path = board_dir / 'config.sample.json'
 
+                    # Load defaults: sample first (lowest), then defaults on top (higher priority)
+                    if config_sample_path.exists():
+                        with open(config_sample_path, 'r') as f:
+                            defaults.update(json.load(f))
+                    if config_defaults_path.exists():
+                        with open(config_defaults_path, 'r') as f:
+                            defaults.update(json.load(f))
+
+                    # Load user overrides
                     if config_path.exists():
                         with open(config_path, 'r') as f:
-                            return json.load(f)
-                    elif config_defaults_path.exists():
-                        with open(config_defaults_path, 'r') as f:
-                            return json.load(f)
-                    elif config_sample_path.exists():
-                        with open(config_sample_path, 'r') as f:
-                            return json.load(f)
+                            user_config = json.load(f)
         except Exception as e:
             debug.error(f"Error loading board config: {e}")
-            pass
 
-        return {}
+        return defaults, user_config
 
     def _detect_display_size(self) -> tuple:
         """
@@ -225,11 +234,11 @@ class BoardBase(ABC):
 
     def get_config_value(self, key: str, default=None):
         """
-        Get a configuration value with priority: central config -> board config -> default.
-
-        For builtin boards, this enables backward compatibility by checking the central
-        config.json first, then falling back to the board-specific config.json, and finally
-        to the provided default value.
+        Get a configuration value with priority resolution:
+            1. Central app config (config/config.json)
+            2. Board user config (board dir config.json)
+            3. Board defaults (board dir config.defaults.json / config.sample.json)
+            4. Code-provided default
 
         Args:
             key: The config key to look up (e.g., 'rotation_rate', 'categories')
@@ -247,22 +256,31 @@ class BoardBase(ABC):
             if len(module_parts) >= 3:
                 board_name = module_parts[2]  # e.g., 'stats_leaders', 'season_countdown'
 
-        # Priority 1: Check central config (e.g., config.stats_leaders_rotation_rate)
+        log_name = board_name or self.board_name
+
+        # Priority 1: Central app config - only if the user explicitly set this key
         if board_name and hasattr(self.data, 'config'):
-            central_key = f"{board_name}_{key}"
-            if hasattr(self.data.config, central_key):
-                value = getattr(self.data.config, central_key)
-                debug.debug(f"{board_name}: Using central config for '{key}': {value}")
+            boards_raw = getattr(self.data.config, '_boards_raw', {})
+            board_section = boards_raw.get(board_name, {})
+            if key in board_section:
+                value = board_section[key]
+                debug.debug(f"{log_name}: Using central config for '{key}': {value}")
                 return value
 
-        # Priority 2: Check board-specific config.json
-        if key in self.board_config:
-            value = self.board_config[key]
-            debug.debug(f"{board_name or self.board_name}: Using board config for '{key}': {value}")
+        # Priority 2: Board user config (config.json in board directory)
+        if key in self._board_user_config:
+            value = self._board_user_config[key]
+            debug.debug(f"{log_name}: Using board user config for '{key}': {value}")
             return value
 
-        # Priority 3: Return default
-        debug.debug(f"{board_name or self.board_name}: Using default for '{key}': {default}")
+        # Priority 3: Board defaults (config.defaults.json / config.sample.json)
+        if key in self._board_defaults:
+            value = self._board_defaults[key]
+            debug.debug(f"{log_name}: Using board defaults for '{key}': {value}")
+            return value
+
+        # Priority 4: Code-provided default
+        debug.debug(f"{log_name}: Using code default for '{key}': {default}")
         return default
 
     def cleanup(self):

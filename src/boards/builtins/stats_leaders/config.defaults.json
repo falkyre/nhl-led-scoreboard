@@ -5,8 +5,8 @@
     "assists",
     "points"
   ],
-  "use_large_font": true,
-  "scroll_speed": 0.07,
+  "large_font": true,
+  "scroll_speed": 0.12,
   "limit": 10,
   "enabled": true
 }

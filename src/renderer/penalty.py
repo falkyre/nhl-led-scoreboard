@@ -3,7 +3,6 @@ from utils import center_text, convert_date_format, get_file
 from renderer.matrix import MatrixPixels
 import logging
 
-from nhl_api.info import TeamInfo
 from renderer.matrix import MatrixPixels
 
 debug = logging.getLogger("scoreboard")
@@ -19,7 +18,7 @@ class PenaltyRenderer:
         penalty_details = team.penalties[-1] # Get the last goal of the list of plays
         team_colors = data.config.team_colors
         team_id = penalty_details.team_id
-        self.team: TeamInfo = data.teams_info[team_id]
+        self.teamAbbrev = team.abbrev
         self.player = penalty_details.player
         self.periodTime = penalty_details.periodTime
         self.penaltyMinutes = penalty_details.penaltyMinutes # TODO: I don't know if we have this
@@ -122,7 +121,7 @@ class PenaltyRenderer:
 
         self.matrix.draw_text_layout(
             self.layout.team_name,
-            self.team.details.abbrev,
+            self.teamAbbrev,
             fillColor=(self.team_txt_color['r'], self.team_txt_color['g'], self.team_txt_color['b']),
             backgroundColor=(self.team_bg_color['r'], self.team_bg_color['g'], self.team_bg_color['b'])
         )

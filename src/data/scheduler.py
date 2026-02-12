@@ -274,14 +274,25 @@ class SchedulerManager:
 
         # stats leaders
         # we could add conditional logic to only pull this if its enabled
-        # but for nwo we will just pull the data and cache it.  It's minimal.
+        # but for now we will just pull the data and cache it.  It's minimal.
         job_id = self.KNOWN_JOB_IDS["statsLeadersWorker"]
         if not self._job_exists(job_id, existing_ids):
+            # Read config from central config if user defined it, otherwise use board defaults
+            stats_raw = self.data.config._boards_raw.get("stats_leaders", {})
+            if not stats_raw:
+                try:
+                    from pathlib import Path
+                    defaults_path = Path(__file__).parent.parent / 'boards' / 'builtins' / 'stats_leaders' / 'config.defaults.json'
+                    if defaults_path.exists():
+                        with open(defaults_path, 'r') as f:
+                            stats_raw = json.load(f)
+                except Exception:
+                    pass
             StatsLeadersWorker(
                 self.data,
                 self.data.scheduler,
-                categories=self.data.config.stats_leaders_categories,
-                limit=self.data.config.stats_leaders_limit
+                categories=stats_raw.get('categories', ['goals', 'assists', 'points']),
+                limit=stats_raw.get('limit', 10)
             )
             existing_ids.append(job_id)
             sb_logger.info(f"Scheduled stats leaders worker (id={job_id})")
