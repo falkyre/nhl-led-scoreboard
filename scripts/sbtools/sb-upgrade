@@ -110,9 +110,7 @@ git config core.autocrlf false
 git config fsck.zeroPaddedFilemode ignore
 git config fetch.fsck.zeroPaddedFilemode ignore
 git config receive.fsck.zeroPaddedFilemode ignore
-# autostash on rebase (#7172)
-resetAutoStash=$(git config --bool rebase.autoStash 2>/dev/null)
-git config rebase.autoStash true
+
 
 local ret=0
 
@@ -150,6 +148,14 @@ fi
 
 # Update nhl-led-scoreboard
 printf "${GREEN}%s${RESET}\n" "Seeing if we can update the NHL LED Scoreboard"
+
+# Check for local changes and stash if necessary
+local stashed=0
+if [[ -n $(git status --porcelain -uno) ]]; then
+  printf "${YELLOW}%s${RESET}\n" "Local changes detected. Stashing..."
+  git stash push -m "sb-upgrade-autostash-$(date +%s)"
+  stashed=1
+fi
 last_commit=$(git rev-parse HEAD)
 if git pull --rebase --stat origin main; then
   # Check if it was really updated or not
@@ -215,11 +221,19 @@ else
   printf "${RED}%s${RESET}\n" 'There was an error updating. Try again later?'
 fi
 
-# Unset git-config values set just for the upgrade
-case "$resetAutoStash" in
-  "") git config --unset rebase.autoStash ;;
-  *) git config rebase.autoStash "$resetAutoStash" ;;
-esac
+# Restore stashed changes if we stashed them
+if [[ $stashed -eq 1 ]]; then
+  printf "${YELLOW}%s${RESET}\n" "Restoring local changes..."
+  if git stash pop; then
+      printf "${GREEN}%s${RESET}\n" "Local changes restored successfully."
+  else
+      printf "${RED}%s${RESET}\n" "Conflict detected during stash pop."
+      printf "${RED}%s${RESET}\n" "Your changes are saved in the stash list."
+      printf "${RED}%s${RESET}\n" "You can locate them with 'git stash list' and apply manually."
+  fi
+fi
+
+
 
 # Exit with `1` if the update failed
 exit $ret
