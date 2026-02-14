@@ -14,6 +14,12 @@ else
   cd "${DIR}"
 fi
 
+# Don't run as root
+if [ $(id -u) -eq 0 ]; then
+  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
+  exit 1
+fi
+
 # Activate virtual environment if it exists
 if [ -f "$HOME/nhlsb-venv/bin/activate" ]; then
   printf "${YELLOW}%s${RESET}\n" "Activating Python virtual environment..."
@@ -25,12 +31,6 @@ if [ -f "$HOME/nhlsb-venv/bin/activate" ]; then
   fi
 else
     printf "${YELLOW}%s${RESET}\n" "Virtual environment not found at $HOME/nhlsb-venv."
-fi
-
-# Don't run as root
-if [ $(id -u) -eq 0 ]; then
-  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
-  exit 1
 fi
 
 # Use colors, but only if connected to a terminal
