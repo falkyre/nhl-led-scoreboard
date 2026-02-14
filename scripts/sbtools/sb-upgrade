@@ -142,6 +142,7 @@ local ret=0
 # --- sb-upgrade Self-Update Block ---
 # Check if the script needs to update itself first
 # Verify we are not already running the updated temporary script
+<<<<<<< HEAD
 if [ "$NO_SELF_CHECK" = false ]; then
     if [[ "$0" != *".tmp" ]]; then
         printf "${GREEN}%s${RESET}\n" "Checking for updates to sb-upgrade..."
@@ -188,6 +189,50 @@ if [ "$NO_SELF_CHECK" = false ]; then
     fi
 else
     printf "${YELLOW}%s${RESET}\n" "Skipping sb-upgrade self-check..."
+=======
+if [[ "$0" != *".tmp" ]]; then
+    printf "${GREEN}%s${RESET}\n" "Checking for updates to sb-upgrade..."
+    
+    # Fetch the latest changes from origin to ensure we have the latest commit info
+    git fetch origin main >/dev/null 2>&1
+
+    # Create a temporary file for the new script
+    TMP_SCRIPT="$0.tmp"
+
+    # Compare the current script file with the one we just fetched (FETCH_HEAD)
+    # This avoids issues if origin/main ref wasn't updated by the fetch
+    if git show FETCH_HEAD:scripts/sbtools/sb-upgrade > "$TMP_SCRIPT" 2>/dev/null; then
+        # Check if there are any differences
+        if ! diff -q "$TMP_SCRIPT" "$0" > /dev/null; then
+            printf "${BLUE}%s${RESET}\n" "A new version of sb-upgrade is available."
+            printf "${YELLOW}%s${RESET}\n" "Updating sb-upgrade script..."
+
+            # Make the temporary script executable
+            chmod +x "$TMP_SCRIPT"
+            
+            printf "${GREEN}%s${RESET}\n" "Restarting with the new sb-upgrade script..."
+            
+            # Execute the temporary script, replacing the current process
+            exec "$TMP_SCRIPT" "$@"
+            
+            # The script execution ends here as exec replaces the process
+            exit 0
+        else
+            printf "${GREEN}%s${RESET}\n" "sb-upgrade is up to date."
+            rm -f "$TMP_SCRIPT"
+        fi
+    else
+        # If git show failed (e.g. file not found in remote), cleanup and ignore
+        rm -f "$TMP_SCRIPT"
+    fi
+else
+    # We are running the temporary script
+    # The 'git pull' later will overwrite the original file on disk.
+    # The temporary file is just for this run.
+    
+    # Setup a trap to remove the temporary file upon exit
+    trap 'rm -f "$0"' EXIT
+>>>>>>> 13bb1329f9299fcc7f8bae0724276c0fb19efbf7
 fi
 # --- End Self-Update Block ---
 
