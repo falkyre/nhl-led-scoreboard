@@ -336,14 +336,20 @@ fi
 # --- nls-controlhub update block ---
 # Check if nls-controlhub is installed
 if dpkg -s nls-controlhub >/dev/null 2>&1; then
-    printf "${GREEN}%s${RESET}\n" "nls-controlhub is installed. Checking for updates..."
-    # Update package lists quietly
-    sudo apt-get update -qq
-    # Try to upgrade nls-controlhub only
-    if sudo apt-get install --only-upgrade -y nls-controlhub; then
-        printf "${GREEN}%s${RESET}\n" "nls-controlhub check complete."
+    # Check if the apt repository is installed
+    if grep -r "falkyre" /etc/apt/ >/dev/null 2>&1; then
+        printf "${GREEN}%s${RESET}\n" "nls-controlhub is installed. Checking for updates..."
+        # Update package lists quietly
+        sudo apt-get update -qq
+        # Try to upgrade nls-controlhub only
+        if sudo apt-get install --only-upgrade -y nls-controlhub; then
+            printf "${GREEN}%s${RESET}\n" "nls-controlhub check complete."
+        else
+            printf "${RED}%s${RESET}\n" "Failed to check/update nls-controlhub."
+        fi
     else
-        printf "${RED}%s${RESET}\n" "Failed to check/update nls-controlhub."
+        printf "${RED}%s${RESET}\n" "nls-controlhub is installed, but the apt repository is missing!"
+        printf "${YELLOW}%s${RESET}\n" "Please go to https://falkyre.github.io/nhl-setup/ for instructions on how to add the apt repository."
     fi
 else
     printf "${YELLOW}%s${RESET}\n" "nls-controlhub is NOT installed."
