@@ -7,6 +7,12 @@ SBHOME=$HOME/nhl-led-scoreboard
 ARCH=$(uname -m)
 DEBIAN_VERSION=$(cat /etc/debian_version)
 
+# Don't run as root
+if [ $(id -u) -eq 0 ]; then
+  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
+  exit 1
+fi
+
 if [ -d "/home/pi/.nhlledportal" ]; then
   cd "$SBHOME"
 else
@@ -59,6 +65,29 @@ if [ -t 1 ]; then
   UNDER=$(printf '\033[4m')
   RESET=$(printf '\033[m')
 fi
+
+# Argument parsing
+VERSION="2026.02.2"
+NO_SELF_CHECK=false
+
+# Loop through arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -v|--version)
+            echo "$VERSION"
+            exit 0
+            ;;
+        --no-self-check)
+            NO_SELF_CHECK=true
+            shift
+            ;;
+        *)
+            # Unknown option, pass provided args to the script logic if needed
+            # For now, just ignore unknown options or handle them as needed
+            shift
+            ;;
+    esac
+done
 
 function download_nhl_setup() {
   printf "${GREEN}%s${RESET}\n" "$1"
@@ -118,48 +147,52 @@ local ret=0
 # --- sb-upgrade Self-Update Block ---
 # Check if the script needs to update itself first
 # Verify we are not already running the updated temporary script
-if [[ "$0" != *".tmp" ]]; then
-    printf "${GREEN}%s${RESET}\n" "Checking for updates to sb-upgrade..."
-    
-    # Fetch the latest changes from origin to ensure we have the latest commit info
-    git fetch origin main >/dev/null 2>&1
+if [ "$NO_SELF_CHECK" = false ]; then
+    if [[ "$0" != *".tmp" ]]; then
+        printf "${GREEN}%s${RESET}\n" "Checking for updates to sb-upgrade..."
+        
+        # Fetch the latest changes from origin to ensure we have the latest commit info
+        git fetch origin main >/dev/null 2>&1
 
-    # Create a temporary file for the new script
-    TMP_SCRIPT="$0.tmp"
+        # Create a temporary file for the new script
+        TMP_SCRIPT="$0.tmp"
 
-    # Compare the current script file with the one we just fetched (FETCH_HEAD)
-    # This avoids issues if origin/main ref wasn't updated by the fetch
-    if git show FETCH_HEAD:scripts/sbtools/sb-upgrade > "$TMP_SCRIPT" 2>/dev/null; then
-        # Check if there are any differences
-        if ! diff -q "$TMP_SCRIPT" "$0" > /dev/null; then
-            printf "${BLUE}%s${RESET}\n" "A new version of sb-upgrade is available."
-            printf "${YELLOW}%s${RESET}\n" "Updating sb-upgrade script..."
+        # Compare the current script file with the one we just fetched (FETCH_HEAD)
+        # This avoids issues if origin/main ref wasn't updated by the fetch
+        if git show FETCH_HEAD:scripts/sbtools/sb-upgrade > "$TMP_SCRIPT" 2>/dev/null; then
+            # Check if there are any differences
+            if ! diff -q "$TMP_SCRIPT" "$0" > /dev/null; then
+                printf "${BLUE}%s${RESET}\n" "A new version of sb-upgrade is available."
+                printf "${YELLOW}%s${RESET}\n" "Updating sb-upgrade script..."
 
-            # Make the temporary script executable
-            chmod +x "$TMP_SCRIPT"
-            
-            printf "${GREEN}%s${RESET}\n" "Restarting with the new sb-upgrade script..."
-            
-            # Execute the temporary script, replacing the current process
-            exec "$TMP_SCRIPT" "$@"
-            
-            # The script execution ends here as exec replaces the process
-            exit 0
+                # Make the temporary script executable
+                chmod +x "$TMP_SCRIPT"
+                
+                printf "${GREEN}%s${RESET}\n" "Restarting with the new sb-upgrade script..."
+                
+                # Execute the temporary script, replacing the current process
+                exec "$TMP_SCRIPT" "$@"
+                
+                # The script execution ends here as exec replaces the process
+                exit 0
+            else
+                printf "${GREEN}%s${RESET}\n" "sb-upgrade is up to date."
+                rm -f "$TMP_SCRIPT"
+            fi
         else
-            printf "${GREEN}%s${RESET}\n" "sb-upgrade is up to date."
+            # If git show failed (e.g. file not found in remote), cleanup and ignore
             rm -f "$TMP_SCRIPT"
         fi
     else
-        # If git show failed (e.g. file not found in remote), cleanup and ignore
-        rm -f "$TMP_SCRIPT"
+        # We are running the temporary script
+        # The 'git pull' later will overwrite the original file on disk.
+        # The temporary file is just for this run.
+        
+        # Setup a trap to remove the temporary file upon exit
+        trap 'rm -f "$0"' EXIT
     fi
 else
-    # We are running the temporary script
-    # The 'git pull' later will overwrite the original file on disk.
-    # The temporary file is just for this run.
-    
-    # Setup a trap to remove the temporary file upon exit
-    trap 'rm -f "$0"' EXIT
+    printf "${YELLOW}%s${RESET}\n" "Skipping sb-upgrade self-check..."
 fi
 # --- End Self-Update Block ---
 
@@ -254,8 +287,6 @@ if [[ $stashed -eq 1 ]]; then
 fi
 
 
-
-
 #Check to see if the nhl_setup has changed, if so, download the newest version
 # Change to ../../nhl_setup to run from repo scripts/sbtools folder
 # Helper function to fetch the latest version with leading zero support
@@ -309,14 +340,20 @@ fi
 # --- nls-controlhub update block ---
 # Check if nls-controlhub is installed
 if dpkg -s nls-controlhub >/dev/null 2>&1; then
-    printf "${GREEN}%s${RESET}\n" "nls-controlhub is installed. Checking for updates..."
-    # Update package lists quietly
-    sudo apt-get update -qq
-    # Try to upgrade nls-controlhub only
-    if sudo apt-get install --only-upgrade -y nls-controlhub; then
-        printf "${GREEN}%s${RESET}\n" "nls-controlhub check complete."
+    # Check if the apt repository is installed
+    if grep -r "falkyre" /etc/apt/ >/dev/null 2>&1; then
+        printf "${GREEN}%s${RESET}\n" "nls-controlhub is installed. Checking for updates..."
+        # Update package lists quietly
+        sudo apt-get update -qq
+        # Try to upgrade nls-controlhub only
+        if sudo apt-get install --only-upgrade -y nls-controlhub; then
+            printf "${GREEN}%s${RESET}\n" "nls-controlhub check complete."
+        else
+            printf "${RED}%s${RESET}\n" "Failed to check/update nls-controlhub."
+        fi
     else
-        printf "${RED}%s${RESET}\n" "Failed to check/update nls-controlhub."
+        printf "${RED}%s${RESET}\n" "nls-controlhub is installed, but the apt repository is missing!"
+        printf "${YELLOW}%s${RESET}\n" "Please go to https://falkyre.github.io/nhl-setup/ for instructions on how to add the apt repository."
     fi
 else
     printf "${YELLOW}%s${RESET}\n" "nls-controlhub is NOT installed."
