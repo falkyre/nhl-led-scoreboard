@@ -7,11 +7,23 @@ SBHOME=$HOME/nhl-led-scoreboard
 ARCH=$(uname -m)
 DEBIAN_VERSION=$(cat /etc/debian_version)
 
+# Don't run as root
+if [ $(id -u) -eq 0 ]; then
+  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
+  exit 1
+fi
+
 if [ -d "/home/pi/.nhlledportal" ]; then
   cd "$SBHOME"
 else
   DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
   cd "${DIR}"
+fi
+
+# Don't run as root
+if [ $(id -u) -eq 0 ]; then
+  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
+  exit 1
 fi
 
 # Activate virtual environment if it exists
@@ -25,12 +37,6 @@ if [ -f "$HOME/nhlsb-venv/bin/activate" ]; then
   fi
 else
     printf "${YELLOW}%s${RESET}\n" "Virtual environment not found at $HOME/nhlsb-venv."
-fi
-
-# Don't run as root
-if [ $(id -u) -eq 0 ]; then
-  tput bold; echo "$(tput setaf 9)You do not need to run this script using sudo, it will handle sudo as required$(tput setaf 9)" ; tput sgr0
-  exit 1
 fi
 
 # Use colors, but only if connected to a terminal
@@ -59,6 +65,29 @@ if [ -t 1 ]; then
   UNDER=$(printf '\033[4m')
   RESET=$(printf '\033[m')
 fi
+
+# Argument parsing
+VERSION="2026.02.2"
+NO_SELF_CHECK=false
+
+# Loop through arguments
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -v|--version)
+            echo "$VERSION"
+            exit 0
+            ;;
+        --no-self-check)
+            NO_SELF_CHECK=true
+            shift
+            ;;
+        *)
+            # Unknown option, pass provided args to the script logic if needed
+            # For now, just ignore unknown options or handle them as needed
+            shift
+            ;;
+    esac
+done
 
 function download_nhl_setup() {
   printf "${GREEN}%s${RESET}\n" "$1"
@@ -102,6 +131,7 @@ git remote -v | while read remote url extra; do
   esac
 done
 
+
 # Set git-config values known to fix git errors
 # Line endings (#4069)
 git config core.eol lf
@@ -110,46 +140,75 @@ git config core.autocrlf false
 git config fsck.zeroPaddedFilemode ignore
 git config fetch.fsck.zeroPaddedFilemode ignore
 git config receive.fsck.zeroPaddedFilemode ignore
-# autostash on rebase (#7172)
-resetAutoStash=$(git config --bool rebase.autoStash 2>/dev/null)
-git config rebase.autoStash true
+
 
 local ret=0
 
-#Check to see if the nhl_setup has changed, if so, download the newest version
-# Change to ../../nhl_setup to run from repo scripts/sbtools folder
-if [[ -a "${SBHOME}/nhl_setup" ]]; then
-  printf "${GREEN}%s${RESET}\n" "Checking for new version of nhl_setup..."
-  LATEST_NHL_SETUP_VERSION=$(curl -s "https://lastversion-api.getpagespeed.com/falkyre/nhl-setup?version" | xargs)
-  CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
-  if [[ "$LATEST_NHL_SETUP_VERSION" != "$CURRENT_NHL_SETUP_VERSION" ]]; then
-    download_nhl_setup "Newer version of nhl_setup found. Downloading..."
-    CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
-    if [[ "$LATEST_NHL_SETUP_VERSION" == "$CURRENT_NHL_SETUP_VERSION" ]]; then
-        printf "${GREEN}%s${RESET}\n" "nhl_setup updated to version $LATEST_NHL_SETUP_VERSION"
+# --- sb-upgrade Self-Update Block ---
+# Check if the script needs to update itself first
+# Verify we are not already running the updated temporary script
+if [ "$NO_SELF_CHECK" = false ]; then
+    if [[ "$0" != *".tmp" ]]; then
+        printf "${GREEN}%s${RESET}\n" "Checking for updates to sb-upgrade..."
+        
+        # Fetch the latest changes from origin to ensure we have the latest commit info
+        git fetch origin main >/dev/null 2>&1
+
+        # Create a temporary file for the new script
+        TMP_SCRIPT="$0.tmp"
+
+        # Compare the current script file with the one we just fetched (FETCH_HEAD)
+        # This avoids issues if origin/main ref wasn't updated by the fetch
+        if git show FETCH_HEAD:scripts/sbtools/sb-upgrade > "$TMP_SCRIPT" 2>/dev/null; then
+            # Check if there are any differences
+            if ! diff -q "$TMP_SCRIPT" "$0" > /dev/null; then
+                printf "${BLUE}%s${RESET}\n" "A new version of sb-upgrade is available."
+                printf "${YELLOW}%s${RESET}\n" "Updating sb-upgrade script..."
+
+                # Make the temporary script executable
+                chmod +x "$TMP_SCRIPT"
+                
+                printf "${GREEN}%s${RESET}\n" "Restarting with the new sb-upgrade script..."
+                
+                # Execute the temporary script, replacing the current process
+                exec "$TMP_SCRIPT" "$@"
+                
+                # The script execution ends here as exec replaces the process
+                exit 0
+            else
+                printf "${GREEN}%s${RESET}\n" "sb-upgrade is up to date."
+                rm -f "$TMP_SCRIPT"
+            fi
+        else
+            # If git show failed (e.g. file not found in remote), cleanup and ignore
+            rm -f "$TMP_SCRIPT"
+        fi
     else
-        printf "${RED}%s${RESET}\n" "nhl_setup update failed. Please run sb-upgrade again."
+        # We are running the temporary script
+        # The 'git pull' later will overwrite the original file on disk.
+        # The temporary file is just for this run.
+        
+        # Setup a trap to remove the temporary file upon exit
+        trap 'rm -f "$0"' EXIT
     fi
-  else
-    printf "${YELLOW}%s${RESET}\n" "nhl_setup is already at the latest version."
-  fi
 else
-  download_nhl_setup "nhl_setup not found. Downloading..."
-  if [[ -a "${SBHOME}/nhl_setup" ]]; then
-    LATEST_NHL_SETUP_VERSION=$(curl -s "https://lastversion-api.getpagespeed.com/falkyre/nhl-setup?version" | xargs)
-    CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
-    if [[ "$LATEST_NHL_SETUP_VERSION" == "$CURRENT_NHL_SETUP_VERSION" ]]; then
-        printf "${GREEN}%s${RESET}\n" "nhl_setup installed to version $LATEST_NHL_SETUP_VERSION"
-    else
-        printf "${RED}%s${RESET}\n" "nhl_setup install failed. Please run sb-upgrade again."
-    fi
-  else
-      printf "${RED}%s${RESET}\n" "nhl_setup download failed. Please run sb-upgrade again."
-  fi
+    printf "${YELLOW}%s${RESET}\n" "Skipping sb-upgrade self-check..."
 fi
+# --- End Self-Update Block ---
+
+
+
 
 # Update nhl-led-scoreboard
 printf "${GREEN}%s${RESET}\n" "Seeing if we can update the NHL LED Scoreboard"
+
+# Check for local changes and stash if necessary
+local stashed=0
+if [[ -n $(git status --porcelain -uno) ]]; then
+  printf "${YELLOW}%s${RESET}\n" "Local changes detected. Stashing..."
+  git stash push -m "sb-upgrade-autostash-$(date +%s)"
+  stashed=1
+fi
 last_commit=$(git rev-parse HEAD)
 if git pull --rebase --stat origin main; then
   # Check if it was really updated or not
@@ -215,11 +274,92 @@ else
   printf "${RED}%s${RESET}\n" 'There was an error updating. Try again later?'
 fi
 
-# Unset git-config values set just for the upgrade
-case "$resetAutoStash" in
-  "") git config --unset rebase.autoStash ;;
-  *) git config rebase.autoStash "$resetAutoStash" ;;
-esac
+# Restore stashed changes if we stashed them
+if [[ $stashed -eq 1 ]]; then
+  printf "${YELLOW}%s${RESET}\n" "Restoring local changes..."
+  if git stash pop; then
+      printf "${GREEN}%s${RESET}\n" "Local changes restored successfully."
+  else
+      printf "${RED}%s${RESET}\n" "Conflict detected during stash pop."
+      printf "${RED}%s${RESET}\n" "Your changes are saved in the stash list."
+      printf "${RED}%s${RESET}\n" "You can locate them with 'git stash list' and apply manually."
+  fi
+fi
+
+
+#Check to see if the nhl_setup has changed, if so, download the newest version
+# Change to ../../nhl_setup to run from repo scripts/sbtools folder
+# Helper function to fetch the latest version with leading zero support
+get_latest_version() {
+    local repo=$1
+    if command -v lastversion >/dev/null 2>&1; then
+        lastversion "$repo" --format tag | sed 's/^[vV]//'
+    else
+        curl -s "https://lastversion-api.getpagespeed.com/$repo" | jq -r '.tag_name' | sed 's/^[vV]//'
+    fi
+}
+
+# --- nhl_setup update block ---
+
+# Check to see if the nhl_setup has changed, if so, download the newest version
+if [[ -a "${SBHOME}/nhl_setup" ]]; then
+  printf "${GREEN}%s${RESET}\n" "Checking for new version of nhl_setup..."
+  
+  LATEST_NHL_SETUP_VERSION=$(get_latest_version "falkyre/nhl-setup")
+  CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
+  
+  if [[ "$LATEST_NHL_SETUP_VERSION" != "$CURRENT_NHL_SETUP_VERSION" ]]; then
+    download_nhl_setup "Newer version of nhl_setup found ($LATEST_NHL_SETUP_VERSION). Downloading..."
+    
+    # Re-verify after download
+    CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
+    if [[ "$LATEST_NHL_SETUP_VERSION" == "$CURRENT_NHL_SETUP_VERSION" ]]; then
+        printf "${GREEN}%s${RESET}\n" "nhl_setup updated to version $LATEST_NHL_SETUP_VERSION"
+    else
+        printf "${RED}%s${RESET}\n" "nhl_setup update failed. (Expected $LATEST_NHL_SETUP_VERSION, but found $CURRENT_NHL_SETUP_VERSION)"
+    fi
+  else
+    printf "${YELLOW}%s${RESET}\n" "nhl_setup is already at the latest version ($CURRENT_NHL_SETUP_VERSION)."
+  fi
+else
+  download_nhl_setup "nhl_setup not found. Downloading..."
+  if [[ -a "${SBHOME}/nhl_setup" ]]; then
+    LATEST_NHL_SETUP_VERSION=$(get_latest_version "falkyre/nhl-setup")
+    CURRENT_NHL_SETUP_VERSION=$($SBHOME/nhl_setup -v | awk '{print $2}')
+    
+    if [[ "$LATEST_NHL_SETUP_VERSION" == "$CURRENT_NHL_SETUP_VERSION" ]]; then
+        printf "${GREEN}%s${RESET}\n" "nhl_setup installed to version $LATEST_NHL_SETUP_VERSION"
+    else
+        printf "${RED}%s${RESET}\n" "nhl_setup install failed. Please run sb-upgrade again."
+    fi
+  else
+      printf "${RED}%s${RESET}\n" "nhl_setup download failed. Please run sb-upgrade again."
+  fi
+fi
+
+# --- nls-controlhub update block ---
+# Check if nls-controlhub is installed
+if dpkg -s nls-controlhub >/dev/null 2>&1; then
+    # Check if the apt repository is installed
+    if grep -r "falkyre" /etc/apt/ >/dev/null 2>&1; then
+        printf "${GREEN}%s${RESET}\n" "nls-controlhub is installed. Checking for updates..."
+        # Update package lists quietly
+        sudo apt-get update -qq
+        # Try to upgrade nls-controlhub only
+        if sudo apt-get install --only-upgrade -y nls-controlhub; then
+            printf "${GREEN}%s${RESET}\n" "nls-controlhub check complete."
+        else
+            printf "${RED}%s${RESET}\n" "Failed to check/update nls-controlhub."
+        fi
+    else
+        printf "${RED}%s${RESET}\n" "nls-controlhub is installed, but the apt repository is missing!"
+        printf "${YELLOW}%s${RESET}\n" "Please go to https://falkyre.github.io/nhl-setup/ for instructions on how to add the apt repository."
+    fi
+else
+    printf "${YELLOW}%s${RESET}\n" "nls-controlhub is NOT installed."
+    printf "${BLUE}%s${RESET}\n" "See https://falkyre.github.io/nhl-setup/ for install instructions if you wish to use the Control Hub."
+fi
+# --- End nls-controlhub update block ---
 
 # Exit with `1` if the update failed
 exit $ret
