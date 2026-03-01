@@ -32,6 +32,15 @@ import signal
 import argparse
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 
+# Import the logo scraper logic
+try:
+    from src.nhl_logo_api import get_nhl_logos
+except ImportError:
+    try:
+        from nhl_logo_api import get_nhl_logos
+    except ImportError:
+        def get_nhl_logos(abbrev): return {}
+
 # --- ARGUMENT PARSING & CONFIGURATION ---
 parser = argparse.ArgumentParser(description='NHL LED Scoreboard Logo Editor')
 parser.add_argument('--venv', 
@@ -227,6 +236,25 @@ def get_schedule():
 def health_check():
     return jsonify({"status": "ok"})
 
+
+@app.route('/api/historical_logos', methods=['GET'])
+def get_historical_logos():
+    team = request.args.get('team')
+    if not team:
+        return jsonify({"error": "Missing team parameter"}), 400
+        
+    try:
+        # Clean team code if it has |alt suffix
+        clean_team = team.split('|')[0] if '|' in team else team
+        
+        logos = get_nhl_logos(clean_team)
+        if not logos or clean_team not in logos:
+            return jsonify({"error": "No historical logos found for this team."}), 404
+            
+        return jsonify({"logos": logos[clean_team]})
+    except Exception as e:
+        print(f"[Backend] Error fetching historical logos: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/emulator/check_ready', methods=['GET'])
 def emulator_check_ready():

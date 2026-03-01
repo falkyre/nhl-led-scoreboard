@@ -407,6 +407,9 @@
                 <button id="btnUploadUrl" onclick="triggerAltUrlUpload()" disabled
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
                     SVG from URL</button>
+                <button id="btnHistorical" onclick="openHistoricalModal()" disabled
+                    style="font-size:0.8em; padding:4px 8px; flex:1;" title="Select a historical logo">Historical
+                    Logos</button>
                 <input type="file" id="altUploadInput" accept=".svg, image/svg+xml" style="display:none">
             </div>
             <!-- COLOR EDITING -->
@@ -583,6 +586,28 @@
         </div>
     </div>
 
+    <!-- Historical Logo Modal -->
+    <div id="historicalModal"
+        style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:1000; align-items:center; justify-content:center;">
+        <div
+            style="background:var(--panel-bg); padding:20px; border-radius:8px; width:80%; max-width:600px; max-height:80vh; overflow-y:auto; border:1px solid #555;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">Select Historical Logo</h3>
+                <button onclick="closeHistoricalModal()"
+                    style="background:transparent; border:none; color:#aaa; font-size:1.5em; cursor:pointer;">&times;</button>
+            </div>
+            <div id="historicalLoading" style="text-align:center; padding:20px; color:#aaa;">Loading logos...</div>
+            <div id="historicalGrid"
+                style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:15px; display:none;">
+                <!-- Filled dynamically by JS -->
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="secondary" onclick="closeHistoricalModal()">Cancel</button>
+                <button id="btnApplyHistorical" onclick="confirmHistoricalSelection()" disabled>Apply Logo</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentConfig = {};
         let layoutConfig = {};
@@ -676,8 +701,101 @@
                     // Already on main, just disable buttons
                     btnFile.disabled = true;
                     btnUrl.disabled = true;
+                    document.getElementById('btnHistorical').disabled = true;
                 }
             }
+        }
+
+        function openHistoricalModal() {
+            const teamVal = document.getElementById('teamSelect').value;
+            if (!teamVal) return;
+
+            let cleanTeam = teamVal;
+            if (cleanTeam.includes('|')) cleanTeam = cleanTeam.split('|')[0];
+
+            document.getElementById('historicalModal').style.display = 'flex';
+            document.getElementById('historicalLoading').style.display = 'block';
+            document.getElementById('historicalGrid').style.display = 'none';
+            document.getElementById('historicalGrid').innerHTML = '';
+            document.getElementById('btnApplyHistorical').disabled = true;
+
+            fetch(`/api/historical_logos?team=${cleanTeam}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('historicalLoading').style.display = 'none';
+                    if (data.error) {
+                        alert(data.error);
+                        closeHistoricalModal();
+                        return;
+                    }
+
+                    const grid = document.getElementById('historicalGrid');
+                    grid.style.display = 'grid';
+
+                    const logos = data.logos;
+                    for (const [era, info] of Object.entries(logos)) {
+                        const div = document.createElement('div');
+                        div.style.background = '#222';
+                        div.style.padding = '10px';
+                        div.style.borderRadius = '6px';
+                        div.style.textAlign = 'center';
+                        div.style.border = '1px solid #444';
+                        div.style.cursor = 'pointer';
+
+                        const img = document.createElement('img');
+                        img.src = info.light_svg;
+                        img.style.width = '100px';
+                        img.style.height = '100px';
+                        img.style.objectFit = 'contain';
+                        img.style.marginBottom = '10px';
+                        img.style.backgroundColor = '#ccc'; // to see white logos
+                        img.style.borderRadius = '4px';
+
+                        const label = document.createElement('div');
+                        label.innerText = `${info.team_abbrev} (${era})`;
+                        label.style.fontSize = '0.8em';
+                        label.style.marginBottom = '10px';
+
+                        const radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = 'historicalSelect';
+                        radio.value = info.light_svg;
+                        radio.style.transform = 'scale(1.2)';
+                        radio.style.cursor = 'pointer';
+
+                        div.onclick = () => {
+                            radio.checked = true;
+                            document.getElementById('btnApplyHistorical').disabled = false;
+                            // Reset borders
+                            Array.from(grid.children).forEach(c => c.style.borderColor = '#444');
+                            div.style.borderColor = '#007acc';
+                        };
+
+                        div.appendChild(img);
+                        div.appendChild(label);
+                        div.appendChild(radio);
+                        grid.appendChild(div);
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to fetch historical logos:", err);
+                    document.getElementById('historicalLoading').innerText = "Failed to load logos.";
+                });
+        }
+
+        function closeHistoricalModal() {
+            document.getElementById('historicalModal').style.display = 'none';
+        }
+
+        function confirmHistoricalSelection() {
+            const selected = document.querySelector('input[name="historicalSelect"]:checked');
+            if (!selected) return;
+
+            const url = selected.value;
+            const team = document.getElementById('teamSelect').value;
+
+            closeHistoricalModal();
+            uploadAltData(team, null, url);
         }
 
         function handleAltUpload(event) {
@@ -918,12 +1036,14 @@
             const chk = document.getElementById('useAltLogo');
             const btnFile = document.getElementById('btnUploadFile');
             const btnUrl = document.getElementById('btnUploadUrl');
+            const btnHist = document.getElementById('btnHistorical');
 
             // Sync Checkbox with Selection
             if (val.includes('|alt')) {
                 chk.checked = true;
                 btnFile.disabled = false;
                 btnUrl.disabled = false;
+                btnHist.disabled = false;
             } else {
                 // If we are just switching teams normally (not via toggleAltButtons "new creation" path),
                 // we should reset the checkbox.
@@ -948,6 +1068,7 @@
                 chk.checked = false;
                 btnFile.disabled = true;
                 btnUrl.disabled = true;
+                btnHist.disabled = true;
             }
 
             loadColors();
