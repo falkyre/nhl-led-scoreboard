@@ -22,6 +22,8 @@
             --text-color: #e0e0e0;
             --accent: #007acc;
             --grid-color: #333;
+            --warning-bg: #ffaa00;
+            --warning-text: #000;
         }
 
         body {
@@ -30,10 +32,42 @@
             color: var(--text-color);
             margin: 0;
             padding: 20px;
+            padding-top: 60px;
+            /* Room for banner */
             display: flex;
             gap: 20px;
             height: 100vh;
             box-sizing: border-box;
+        }
+
+        #unsavedBanner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--warning-bg);
+            color: var(--warning-text);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+            display: none;
+            /* Hidden by default */
+        }
+
+        #unsavedBanner button {
+            background-color: #000;
+            color: #fff;
+            padding: 5px 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        #unsavedBanner button:hover {
+            background-color: #333;
         }
 
         .controls {
@@ -140,7 +174,7 @@
             background: rgba(255, 0, 0, 0.9);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            pointer-events: none;
+            /* pointer-events: none; - Removed to allow clicking but maybe not needed if it's draggable? Actually it shouldn't interfere. Let's rely on updateLogoFromInput logic for unsaved tracking */
             z-index: 25;
             box-shadow: 0 0 4px #ff0000;
         }
@@ -374,6 +408,13 @@
 </head>
 
 <body>
+    <div id="unsavedBanner">
+        <span>You have unsaved changes.</span>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div id="statusMsg" class="status" style="color: #000; text-align: right; margin-right: 10px;"></div>
+            <button onclick="saveConfig()">Save Changes</button>
+        </div>
+    </div>
 
     <div class="controls">
         <h2>Configuration</h2>
@@ -494,10 +535,6 @@
         <div class="row" style="margin-top:10px;">
             <button class="secondary" onclick="toggleFlip()">Flip Horizontal</button>
             <button class="secondary" onclick="resetDefaults()">Reset</button>
-        </div>
-        <div style="margin-top: auto;">
-            <button onclick="saveConfig()" style="width:100%">SAVE CHANGES</button>
-            <div id="statusMsg" class="status"></div>
         </div>
     </div>
 
@@ -620,6 +657,17 @@
 
         let opponentConfig = null;
         let emulatorRunning = false;
+        let hasUnsavedChanges = false;
+
+        function markUnsaved() {
+            hasUnsavedChanges = true;
+            document.getElementById('unsavedBanner').style.display = 'flex';
+        }
+
+        function clearUnsaved() {
+            hasUnsavedChanges = false;
+            document.getElementById('unsavedBanner').style.display = 'none';
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             // Restore state BEFORE verifying status
@@ -660,6 +708,7 @@
         }
 
         function toggleAltButtons() {
+            markUnsaved();
             const chk = document.getElementById('useAltLogo');
             const btnFile = document.getElementById('btnUploadFile');
             const btnUrl = document.getElementById('btnUploadUrl');
@@ -920,13 +969,6 @@
                             if (cleanTeam.includes('|')) cleanTeam = cleanTeam.split('|')[0];
 
                             let logoType = window.restoreTeam.includes('|alt') ? 'alt' : 'light';
-
-                            // Persist selection
-                            fetch('/api/logo_selection', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ team: cleanTeam, type: logoType })
-                            });
 
                             // This will call loadColors and updateUI
                             handleTeamChange();
@@ -1831,8 +1873,12 @@
         `;
         }
 
-        function updateLogoFromInput() { renderVisuals(); }
+        function updateLogoFromInput() {
+            markUnsaved();
+            renderVisuals();
+        }
         function toggleFlip() {
+            markUnsaved();
             const img = document.getElementById('logoImg');
             let f = parseInt(img.dataset.flip);
             f = f === 1 ? 0 : 1;
@@ -1841,6 +1887,7 @@
         }
 
         function resetDefaults() {
+            markUnsaved();
             const team = document.getElementById('teamSelect').value;
             const stance = document.getElementById('stanceSelect').value;
             let conf = getTeamConfig(team, stance);
@@ -1916,17 +1963,18 @@
                             .then(res2 => {
                                 if (res2.status === 'success') {
                                     status.innerText = "Saved!";
-                                    status.style.color = "#00ff00";
+                                    status.style.color = "#005500"; // Darker green for banner
+                                    clearUnsaved();
                                 } else {
                                     console.error("Failed to save selection", res2);
                                     status.innerText = "Saved Config (Selection Error)";
-                                    status.style.color = "#ffaa00";
+                                    status.style.color = "#bb0000";
                                 }
                             })
                             .catch(err2 => {
                                 console.error("Failed to save selection", err2);
                                 status.innerText = "Saved Config (Selection Error)";
-                                status.style.color = "#ffaa00";
+                                status.style.color = "#bb0000";
                             })
                             .finally(() => {
                                 setTimeout(() => status.innerText = "", 3000);
@@ -1934,7 +1982,7 @@
 
                     } else {
                         status.innerText = "Error: " + (res.message || "Unknown");
-                        status.style.color = "#ff4444";
+                        status.style.color = "#bb0000";
                         setTimeout(() => status.innerText = "", 3000);
                     }
                 });
@@ -2003,6 +2051,7 @@
                 const dMatrixY = Math.round(dy / EDITOR_SCALE);
 
                 if (dMatrixX !== 0 || dMatrixY !== 0) {
+                    markUnsaved();
                     const xInput = document.getElementById('posX');
                     const yInput = document.getElementById('posY');
                     xInput.value = parseInt(xInput.value) + dMatrixX;
@@ -2016,6 +2065,7 @@
             window.addEventListener('mouseup', () => {
                 if (isResizing) {
                     isResizing = false;
+                    markUnsaved();
                     if (!window.event || !window.event.shiftKey) img.classList.remove('resizing');
                 }
                 if (isDragging) {
