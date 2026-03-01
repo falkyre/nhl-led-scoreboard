@@ -582,6 +582,33 @@ def upload_alt_logo():
             
         saved_files = []
         
+        # -- SVG Check and Local Save (Outside loop) --
+        is_svg = False
+        if b'<svg' in img_bytes[:2048].lower():
+            is_svg = True
+
+        if not is_svg:
+            return jsonify({"status": "error", "message": "SVG files only."}), 400
+
+        # Place the uploaded SVG into the assets/logos/_local with the file name {TEAM}_alt.svg
+        local_directory = os.path.join(ASSETS_DIR, 'logos', '_local')
+        os.makedirs(local_directory, exist_ok=True)
+        local_svg_path = os.path.join(local_directory, f"{team}_alt.svg")
+        with open(local_svg_path, 'wb') as f:
+            f.write(img_bytes)
+
+        # Convert SVG to PNG for the scoreboard processing (once)
+        if cairosvg:
+            print("[Upload] Detected SVG, converting to PNG...")
+            try:
+                png_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
+            except Exception as e:
+                print(f"[Upload] SVG conversion failed: {e}")
+                png_bytes = img_bytes # Fallback, though PIL will fail
+        else:
+            print("[Upload] Warning: SVG uploaded but cairosvg not available.")
+            png_bytes = img_bytes
+
         for tgt in targets:
             tw, th = tgt['w'], tgt['h']
             filename = f"{tw}x{th}.png"
@@ -607,27 +634,8 @@ def upload_alt_logo():
                 except:
                     pass
 
-            # Check if it's an SVG and convert if possible
-            is_svg = False
-            # Simple check for SVG header/content
-            if img_bytes.strip().startswith(b'<svg') or (b'<?xml' in img_bytes[:100] and b'<svg' in img_bytes[:300]):
-                is_svg = True
-            
-            # Additional check: If URL ends in .svg or file content type (touched via filename earlier but we have bytes now)
-            
-            if is_svg:
-                if cairosvg:
-                    print("[Upload] Detected SVG, converting to PNG...")
-                    try:
-                        img_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
-                    except Exception as e:
-                        print(f"[Upload] SVG conversion failed: {e}")
-                        # Let it fall through to PIL to fail if it really is bad
-                else:
-                    print("[Upload] Warning: SVG uploaded but cairosvg not available.")
-
             # Resize and Save
-            with Image.open(io.BytesIO(img_bytes)) as img:
+            with Image.open(io.BytesIO(png_bytes)) as img:
                 # Convert to RGBA
                 img = img.convert("RGBA")
                 
@@ -722,7 +730,11 @@ def save_logo_selection():
             logos_data['_default'] = 'light'
 
         # Update selection
-        logos_data[team] = logo_type
+        if logo_type == 'alt':
+            logos_data[team] = logo_type
+        else:
+            if team in logos_data:
+                del logos_data[team]
 
         # Write back
         with open(logos_file_path, 'w') as f:

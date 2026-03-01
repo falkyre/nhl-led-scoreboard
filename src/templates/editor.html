@@ -403,11 +403,11 @@
             <div style="margin-top:5px; display:flex; gap:5px;">
                 <button id="btnUploadFile" onclick="triggerAltUpload()" disabled
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
-                    File</button>
+                    local SVG</button>
                 <button id="btnUploadUrl" onclick="triggerAltUrlUpload()" disabled
                     style="font-size:0.8em; padding:4px 8px; flex:1;" title="Upload alternate logo">Upload
-                    from URL</button>
-                <input type="file" id="altUploadInput" accept="image/*" style="display:none">
+                    SVG from URL</button>
+                <input type="file" id="altUploadInput" accept=".svg, image/svg+xml" style="display:none">
             </div>
             <!-- COLOR EDITING -->
             <div style="margin-top:10px; background:#222; padding:8px; border-radius:4px; border:1px solid #333;">
@@ -626,6 +626,11 @@
             const url = prompt("Enter Image URL:");
             if (!url) return;
 
+            if (!url.toLowerCase().split('?')[0].endsWith('.svg')) {
+                alert("SVG files only.");
+                return;
+            }
+
             uploadAltData(team, null, url);
         }
 
@@ -678,6 +683,12 @@
         function handleAltUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            if (file.type !== 'image/svg+xml' && !file.name.toLowerCase().endsWith('.svg')) {
+                alert("SVG files only.");
+                event.target.value = '';
+                return;
+            }
 
             const team = document.getElementById('teamSelect').value;
             if (!team) {
@@ -785,20 +796,35 @@
                         // verify exists
                         if ([...sel.options].some(o => o.value === window.restoreTeam)) {
                             sel.value = window.restoreTeam;
+                            document.getElementById('useAltLogo').checked = window.restoreTeam.includes('|alt');
+
+                            let cleanTeam = window.restoreTeam;
+                            if (cleanTeam.includes('|')) cleanTeam = cleanTeam.split('|')[0];
+
+                            let logoType = window.restoreTeam.includes('|alt') ? 'alt' : 'light';
+
+                            // Persist selection
+                            fetch('/api/logo_selection', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ team: cleanTeam, type: logoType })
+                            });
+
+                            // This will call loadColors and updateUI
+                            handleTeamChange();
+                        } else {
+                            loadColors();
+                            updateUI();
                         }
                         window.restoreTeam = null;
-
-                        // If we restored team, we might want to trigger opponent update if in sim mode with date set
-                        // but let's just let updateUI handle visual
+                    } else {
+                        if (window.restoreStance) {
+                            document.getElementById('stanceSelect').value = window.restoreStance;
+                            window.restoreStance = null;
+                        }
+                        loadColors();
+                        updateUI();
                     }
-
-                    if (window.restoreStance) {
-                        document.getElementById('stanceSelect').value = window.restoreStance;
-                        window.restoreStance = null;
-                    }
-
-                    loadColors(); // Load colors AFTER restoring selection
-                    updateUI();
                 })
                 .catch(err => console.error("Config load failed", err));
         }
