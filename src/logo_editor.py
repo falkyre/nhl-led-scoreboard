@@ -761,6 +761,51 @@ def upload_alt_logo():
         print(f"Upload error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/discard_alt', methods=['POST'])
+def discard_alt_logo():
+    team = request.json.get('team')
+    if not team:
+        return jsonify({"status": "error", "message": "Missing team"}), 400
+
+    if '|' in team:
+        team = team.split('|')[0]
+
+    try:
+        # 1. Remove from global logos.json
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        if os.path.exists(logos_file_path):
+            with open(logos_file_path, 'r') as f:
+                logos_data = json.load(f)
+            
+            if team in logos_data and logos_data[team] == "alt":
+                del logos_data[team]
+                with open(logos_file_path, 'w') as f:
+                    json.dump(logos_data, f, indent=2)
+
+        # 2. Remove 'alt' keys from layout configurations
+        for size in ["64x32", "128x64"]:
+            config_path = os.path.join(CONFIG_DIR, f"logos_{size}.json")
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                
+                if 'scoreboard' in config_data and 'logos' in config_data['scoreboard']:
+                    logos = config_data['scoreboard']['logos']
+                    if team in logos and 'alt' in logos[team]:
+                        del logos[team]['alt']
+                        with open(config_path, 'w') as f:
+                            json.dump(config_data, f, indent=2)
+
+        # 3. Best effort delete the physical alt images 
+        alt_dir = os.path.join(ASSETS_DIR, 'logos', team, 'alt')
+        if os.path.exists(alt_dir):
+            shutil.rmtree(alt_dir)
+
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"Discard error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/logo_selection', methods=['POST'])
 def save_logo_selection():
     try:

@@ -671,8 +671,27 @@
             document.getElementById('unsavedBanner').style.display = 'none';
         }
 
-        function discardConfig() {
-            if (confirm("Are you sure you want to discard your unsaved changes?")) {
+        async function discardConfig() {
+            if (confirm("Are you sure you want to discard your unsaved changes? If you just uploaded an Alternative Logo, it will be erased.")) {
+                const team = document.getElementById('teamSelect').value;
+                if (team) {
+                    try {
+                        const cleanTeam = team.includes('|') ? team.split('|')[0] : team;
+                        await fetch('/api/discard_alt', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ team: cleanTeam })
+                        });
+
+                        // Make sure our local logos catalog forgets the alt logo if it existed
+                        const r = await fetch('/api/logos_config');
+                        rootLogosConfig = await r.json();
+
+                    } catch (e) {
+                        console.error("Failed to discard alt logo backend data", e);
+                    }
+                }
+
                 clearUnsaved();
                 if (currentFileName) {
                     loadConfig(currentFileName);
