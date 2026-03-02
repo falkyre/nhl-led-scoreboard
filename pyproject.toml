@@ -1,6 +1,6 @@
 [project]
 name = "nhl-led-scoreboard"
-version = "2026.02.2"
+version = "2026.03.0"
 description = "🚨 Display NHL score of your favorite team on a Raspberry Pi driven RGB LED matrix. 🚨"
 readme = "README.md"
 requires-python = ">=3.11"

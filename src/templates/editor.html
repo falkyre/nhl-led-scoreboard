@@ -412,6 +412,7 @@
         <span>You have unsaved changes.</span>
         <div style="display: flex; gap: 10px; align-items: center;">
             <div id="statusMsg" class="status" style="color: #000; text-align: right; margin-right: 10px;"></div>
+            <button onclick="discardConfig()" style="background-color: #555;">Discard Changes</button>
             <button onclick="saveConfig()">Save Changes</button>
         </div>
     </div>
@@ -669,6 +670,18 @@
             document.getElementById('unsavedBanner').style.display = 'none';
         }
 
+        function discardConfig() {
+            if (confirm("Are you sure you want to discard your unsaved changes?")) {
+                clearUnsaved();
+                if (currentFileName) {
+                    loadConfig(currentFileName);
+                } else {
+                    const sizeStr = document.getElementById('sizeSelect').value;
+                    loadConfig(`logos_${sizeStr}.json`);
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Restore state BEFORE verifying status
             loadState();
@@ -712,6 +725,7 @@
             const chk = document.getElementById('useAltLogo');
             const btnFile = document.getElementById('btnUploadFile');
             const btnUrl = document.getElementById('btnUploadUrl');
+            const btnHist = document.getElementById('btnHistorical');
             const sel = document.getElementById('teamSelect');
             const currentVal = sel.value;
 
@@ -730,15 +744,17 @@
                         }
                     }
                     if (!found) {
-                        alert(`There is no Alternative Logo for ${currentVal}, use one of the two buttons to upload one.`);
+                        alert(`There is no Alternative Logo for ${currentVal}, use one of the available buttons to choose one.`);
                         // Keep buttons enabled so user can upload
                         btnFile.disabled = false;
                         btnUrl.disabled = false;
+                        btnHist.disabled = false;
                     }
                 } else {
                     // Already on alt, just ensure buttons enabled
                     btnFile.disabled = false;
                     btnUrl.disabled = false;
+                    btnHist.disabled = false;
                 }
             } else {
                 // Unchecked: Switch back to MAIN if currently on ALT
@@ -750,7 +766,7 @@
                     // Already on main, just disable buttons
                     btnFile.disabled = true;
                     btnUrl.disabled = true;
-                    document.getElementById('btnHistorical').disabled = true;
+                    btnHist.disabled = true;
                 }
             }
         }
@@ -1748,7 +1764,7 @@
                     team = parts[0];
                     type = parts[1];
                 }
-                return `/assets/logos/${team}/${type}/${sizeStr}.png`;
+                return `/assets/logos/${team}/${type}/${sizeStr}.png?t=${new Date().getTime()}`;
             };
 
             const img1 = document.getElementById('logoImg');

@@ -2,6 +2,7 @@ import json
 import urllib.request
 import urllib.error
 import re
+import sys
 
 def _fetch_json(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -132,9 +133,13 @@ def export_to_toml(data, filename="config.toml"):
         print("To export to TOML, install the library: pip install tomli-w")
 
 if __name__ == "__main__":
-    # Test the function by running this file directly
-    logos = get_nhl_logos("CAR")
+    if len(sys.argv) < 2:
+        print("Error: You must provide the triCode of the NHL team to search logos (e.g., WPG)")
+        sys.exit(1)
+        
+    team_code = sys.argv[1].upper()
+    logos = get_nhl_logos(team_code)
     
     # Example exports
-    export_to_json(logos, "nhl_logos.json")
-    export_to_toml(logos, "nhl_logos.toml")
+    export_to_json(logos, f"{team_code}_logos.json")
+    export_to_toml(logos, f"{team_code}_logos.toml")
