@@ -649,6 +649,7 @@
     <script>
         let currentConfig = {};
         let layoutConfig = {};
+        let rootLogosConfig = {};
         let currentFileName = "";
         let matrixW = 64;
         let matrixH = 32;
@@ -682,9 +683,9 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // Restore state BEFORE verifying status
-            loadState();
+            await loadState();
             checkEmulatorStatus(true);
 
             setupDrag();
@@ -903,12 +904,18 @@
                 body: formData
             })
                 .then(r => r.json())
-                .then(data => {
+                .then(async data => {
                     if (data.status === 'success') {
-                        alert("Upload successful!");
-
                         // The backend should have updated the config to include 'alt' for this team.
                         // We need to reload the config to see it in the list.
+                        // First, update rootLogosConfig which triggers Alt discovery in the dropdown.
+                        try {
+                            const r = await fetch('/api/logos_config');
+                            rootLogosConfig = await r.json();
+                        } catch (e) {
+                            console.error("Failed to fetch updated root logos config", e);
+                        }
+
                         // We also want to auto-select it.
                         let targetTeam = team;
                         if (!team.includes('|alt')) {
@@ -919,6 +926,9 @@
                         window.restoreTeam = targetTeam;
 
                         loadConfig();
+
+                        // Small success notification instead of alert so we don't block the UI refresh
+                        showStatus("Upload successful!", "lime");
 
                     } else {
                         alert("Upload failed: " + data.message);
@@ -1387,11 +1397,19 @@
             localStorage.setItem('nhl_editor_state', JSON.stringify(state));
         }
 
-        function loadState() {
-            const saved = localStorage.getItem('nhl_editor_state');
-            if (!saved) return;
-
+        async function loadState() {
             try {
+                // Fetch global logos config for alt team checks
+                try {
+                    const r = await fetch('/api/logos_config');
+                    rootLogosConfig = await r.json();
+                } catch (e) {
+                    console.error("Failed to fetch root logos config", e);
+                }
+
+                const saved = localStorage.getItem('nhl_editor_state');
+                if (!saved) return;
+
                 const state = JSON.parse(saved);
 
                 // Matrix Size
@@ -1674,14 +1692,19 @@
             const cur1 = sel1.value;
             const cur2 = sel2.value;
             const options = [];
+
             STANDARD_TEAMS.forEach(t => options.push({ label: t, value: t }));
+
+            // Add Alternate options based on config/logos.json
+            STANDARD_TEAMS.forEach(team => {
+                if (rootLogosConfig[team] === 'alt') {
+                    options.push({ label: `${team} (Alt)`, value: `${team}|alt` });
+                }
+            });
+
+            // Add any custom teams not in standard listing
             if (currentConfig.scoreboard && currentConfig.scoreboard.logos) {
                 const logos = currentConfig.scoreboard.logos;
-                STANDARD_TEAMS.forEach(team => {
-                    if (logos[team] && logos[team].alt) {
-                        options.push({ label: `${team} (Alt)`, value: `${team}|alt` });
-                    }
-                });
                 Object.keys(logos).forEach(k => {
                     if (k.startsWith('_')) return;
                     if (!STANDARD_TEAMS.includes(k) && !k.includes('|')) {
@@ -1691,6 +1714,7 @@
                     }
                 });
             }
+
             options.sort((a, b) => a.label.localeCompare(b.label));
             sel1.innerHTML = '';
             sel2.innerHTML = '<option value="">(None)</option>';
@@ -1768,6 +1792,7 @@
             };
 
             const img1 = document.getElementById('logoImg');
+            img1.src = '';
             img1.src = getImageSrc(team1Val);
 
             let conf1 = getTeamConfig(team1Val, stance1);
@@ -1784,6 +1809,7 @@
             const img2 = document.getElementById('logoImg2');
             if (team2Val) {
                 img2.style.display = 'block';
+                img2.src = '';
                 img2.src = getImageSrc(team2Val);
 
                 // Forces opponent to use opposite stance
@@ -1961,7 +1987,7 @@
                 body: JSON.stringify(currentConfig)
             })
                 .then(r => r.json())
-                .then(res => {
+                .then(async res => {
                     if (res.status === 'success') {
                         // Also save the logo selection (Alt vs Light)
                         const chk = document.getElementById('useAltLogo');
@@ -1976,11 +2002,36 @@
                             body: JSON.stringify({ team: cleanTeam, type: logoType })
                         })
                             .then(r2 => r2.json())
-                            .then(res2 => {
+                            .then(async res2 => {
                                 if (res2.status === 'success') {
                                     status.innerText = "Saved!";
                                     status.style.color = "#005500"; // Darker green for banner
                                     clearUnsaved();
+
+                                    // Refresh global logos config to ensure Alt is discoverable
+                                    try {
+                                        const logosRes = await fetch('/api/logos_config');
+                                        rootLogosConfig = await logosRes.json();
+                                    } catch (e) {
+                                        console.error("Failed to refresh root logos config on save", e);
+                                    }
+
+                                    // Determine what the target team selection should be
+                                    let targetTeam = cleanTeam;
+                                    if (logoType === 'alt') targetTeam += '|alt';
+
+                                    // Refresh list to potentially show new Alt entry
+                                    refreshTeamList();
+
+                                    // Re-select our team
+                                    const sel = document.getElementById('teamSelect');
+                                    if ([...sel.options].some(o => o.value === targetTeam)) {
+                                        sel.value = targetTeam;
+                                    }
+
+                                    // Ensure visuals are up-to-date with potentially new saved state
+                                    updateUI();
+
                                 } else {
                                     console.error("Failed to save selection", res2);
                                     status.innerText = "Saved Config (Selection Error)";

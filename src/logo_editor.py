@@ -414,6 +414,18 @@ def list_files():
         files = []
     return jsonify(files)
 
+@app.route('/api/logos_config')
+def get_logos_config():
+    logos_json_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+    if not os.path.exists(logos_json_path):
+        return jsonify({})
+    try:
+        with open(logos_json_path, 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/config/<filename>', methods=['GET', 'POST'])
 def handle_config(filename):
     file_path = os.path.join(CONFIG_DIR, filename)
@@ -722,6 +734,26 @@ def upload_alt_logo():
                         
             except Exception as e:
                 print(f"Warning: Failed to update config file for ALT logo: {e}")
+
+        # Ensure the global logos.json flags this team as having an 'alt' logo
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        if os.path.exists(logos_file_path):
+            try:
+                with open(logos_file_path, 'r') as f:
+                    logos_data = json.load(f)
+                
+                # If they didn't have an alt flag before, add it now
+                if team in logos_data or team not in logos_data:
+                    logos_data[team] = "alt"
+
+                # Ensure _default isn't wiped out
+                if '_default' not in logos_data:
+                    logos_data['_default'] = 'light'
+
+                with open(logos_file_path, 'w') as f:
+                    json.dump(logos_data, f, indent=2)
+            except Exception as e:
+                print(f"Warning: Failed to update logos.json for ALT logo: {e}")
 
         return jsonify({"status": "success", "files": saved_files})
 
