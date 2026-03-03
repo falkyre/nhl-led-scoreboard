@@ -401,6 +401,65 @@
             height: 12px;
             border-radius: 2px;
         }
+
+        /* Editor Toggle Switch CSS */
+        .editor-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 24px;
+            border: 1px solid #555;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent);
+        }
+
+        input:focus+.slider {
+            box-shadow: 0 0 1px var(--accent);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(24px);
+        }
     </style>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/dark.css">
@@ -541,8 +600,16 @@
 
     <div class="workspace">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-            <h3>Visual Editor <span id="resDisplay" style="font-weight:normal; font-size:0.8em; color:#888;"></span>
+            <h3>Scoreboard Editor <span id="resDisplay" style="font-weight:normal; font-size:0.8em; color:#888;"></span>
             </h3>
+            <div class="editor-toggle-container">
+                <span style="color:#fff;">Scoreboard</span>
+                <label class="switch" title="Switch to Team Summary Editor">
+                    <input type="checkbox" onchange="switchEditor(this, '/team_summary')">
+                    <span class="slider"></span>
+                </label>
+                <span style="color:#888;">Team Summary</span>
+            </div>
         </div>
 
         <div id="canvasContainer" class="editor-container">
@@ -660,6 +727,36 @@
         let opponentConfig = null;
         let emulatorRunning = false;
         let hasUnsavedChanges = false;
+
+        function handleToggleRevert(checkbox) {
+            checkbox.checked = !checkbox.checked;
+        }
+
+        async function switchEditor(checkbox, targetUrl) {
+            if (hasUnsavedChanges) {
+                if (confirm("You have unsaved changes. Are you sure you want to switch editors? Unsaved changes will be discarded. (If you just uploaded an Alternative Logo, it will be erased.)")) {
+                    const team = document.getElementById('teamSelect').value;
+                    if (team) {
+                        try {
+                            const cleanTeam = team.includes('|') ? team.split('|')[0] : team;
+                            await fetch('/api/discard_alt', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ team: cleanTeam })
+                            });
+                        } catch (e) {
+                            console.error("Failed to discard alt logo backend data", e);
+                        }
+                    }
+                    window.location.href = targetUrl;
+                } else {
+                    handleToggleRevert(checkbox);
+                }
+            } else {
+                window.location.href = targetUrl;
+            }
+        }
+
 
         function markUnsaved() {
             hasUnsavedChanges = true;

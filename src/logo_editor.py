@@ -670,10 +670,10 @@ def upload_alt_logo():
                 png_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
             except Exception as e:
                 print(f"[Upload] SVG conversion failed: {e}")
-                png_bytes = img_bytes # Fallback, though PIL will fail
+                return jsonify({"status": "error", "message": f"SVG conversion failed. The system may be missing 'cairo' dependencies (e.g. brew install cairo on mac). {str(e)}"}), 400
         else:
             print("[Upload] Warning: SVG uploaded but cairosvg not available.")
-            png_bytes = img_bytes
+            return jsonify({"status": "error", "message": "SVG conversion failed: 'cairosvg' python module is not available."}), 400
 
         for tgt in targets:
             tw, th = tgt['w'], tgt['h']
@@ -826,6 +826,11 @@ def discard_alt_logo():
         alt_dir = os.path.join(ASSETS_DIR, 'logos', team, 'alt')
         if os.path.exists(alt_dir):
             shutil.rmtree(alt_dir)
+            
+        # 4. Also delete the uploaded SVG in _local
+        local_svg_path = os.path.join(ASSETS_DIR, 'logos', '_local', f"{team}_alt.svg")
+        if os.path.exists(local_svg_path):
+            os.remove(local_svg_path)
 
         return jsonify({"status": "success"})
     except Exception as e:
