@@ -95,10 +95,14 @@ else:
 
 
 try:
-    import cairosvg
     from PIL import Image
+except ImportError as e:
+    print(f"Warning: Pillow not found ({e}). Image processing will fail.")
+
+try:
+    import cairosvg
 except (ImportError, OSError) as e:
-    print(f"Warning: Image libraries not found or system dependency missing ({e}). Logo generation will not work.")
+    print(f"Warning: cairosvg or system dependency missing ({e}). SVG generation will not work.")
     cairosvg = None
 
 app = Flask(__name__, template_folder='templates')
@@ -145,6 +149,28 @@ def index():
             pass
             
     return render_template('editor.html', 
+                           teams=TEAMS, 
+                           emulator_port=emulator_port, 
+                           emulator_pixel_size=emulator_pixel_size)
+
+@app.route('/team_summary')
+def team_summary_index():
+    emulator_port = 8888
+    emulator_pixel_size = 10 
+    
+    if os.path.exists(EMULATOR_CONFIG_PATH):
+        try:
+            with open(EMULATOR_CONFIG_PATH, 'r') as f:
+                data = json.load(f)
+                emulator_port = data.get('browser', {}).get('port', 8888)
+                if 'pixel_size' in data:
+                    emulator_pixel_size = int(data['pixel_size'])
+                elif 'display' in data and 'pixel_size' in data['display']:
+                    emulator_pixel_size = int(data['display']['pixel_size'])
+        except:
+            pass
+            
+    return render_template('team_summary_editor.html', 
                            teams=TEAMS, 
                            emulator_port=emulator_port, 
                            emulator_pixel_size=emulator_pixel_size)
