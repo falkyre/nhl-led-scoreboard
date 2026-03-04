@@ -606,6 +606,56 @@ def handle_colors():
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/factory_reset_logos', methods=['POST'])
+def factory_reset_logos():
+    try:
+        # Run git restore for the core logos files
+        print("[Factory Reset] Running git restore on config/logos.json and config/layout/logos_*.json...")
+        subprocess.run(
+            ["git", "restore", "config/logos.json"],
+            cwd=INSTALL_DIR,
+            check=False
+        )
+        
+        # We can't glob directly in subprocess.run without shell=True, 
+        # so let's glob it with Python and restore each or all at once.
+        import glob
+        layout_logos_files = glob.glob(os.path.join(CONFIG_DIR, "logos_*.json"))
+        
+        # Re-build git restore args for the layout files
+        if layout_logos_files:
+            restore_args = ["git", "restore"] + layout_logos_files
+            subprocess.run(
+                restore_args,
+                cwd=INSTALL_DIR,
+                check=False
+            )
+            
+        # Clean up backup files (*.bak) in config/ and config/layout/
+        print("[Factory Reset] Cleaning up backup files...")
+        
+        # 1. Clean config/logos.json.*.bak
+        config_dir = os.path.join(INSTALL_DIR, 'config')
+        for f in os.listdir(config_dir):
+            if f.startswith("logos.json.") and f.endswith(".bak"):
+                try:
+                    os.remove(os.path.join(config_dir, f))
+                except Exception as e:
+                    print(f"Warning: Failed to delete {f}: {e}")
+                    
+        # 2. Clean config/layout/logos_*.json.*.bak
+        for f in os.listdir(CONFIG_DIR):
+            if f.startswith("logos_") and ".json." in f and f.endswith(".bak"):
+                try:
+                    os.remove(os.path.join(CONFIG_DIR, f))
+                except Exception as e:
+                    print(f"Warning: Failed to delete {f}: {e}")
+                    
+        return jsonify({"status": "success", "message": "Logos configuration reset to defaults."})
+    except Exception as e:
+        print(f"[Factory Reset] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/upload_alt', methods=['POST'])
 def upload_alt_logo():
     team = request.form.get('team')

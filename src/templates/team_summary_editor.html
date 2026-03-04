@@ -607,6 +607,10 @@
                     <span class="slider"></span>
                 </label>
                 <span style="color:#fff;">Team Summary</span>
+                <button class="secondary" onclick="factoryResetLogos()"
+                    style="margin-left:15px; background:var(--panel-bg); color:#cc3300; border:1px solid #cc3300; font-size:0.8em; padding:4px 8px;"
+                    title="Reset logos.json and logos_{W}x{H}.json to defaults and clean backups">Reset to
+                    Default</button>
             </div>
         </div>
 
@@ -800,6 +804,26 @@
                 } else {
                     const sizeStr = document.getElementById('sizeSelect').value;
                     loadConfig(`logos_${sizeStr}.json`);
+                }
+            }
+        }
+
+        async function factoryResetLogos() {
+            if (confirm("WARNING: This will reset your configurations (logos.json and all layouts in config/layout) to their factory defaults from the code repository, AND it will forcibly delete all '.bak' backup versions of these files.\n\nAre you absolutely sure you want to proceed?")) {
+                try {
+                    const res = await fetch('/api/factory_reset_logos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert(data.message);
+                        window.location.reload(); // Reload to pull fresh config
+                    } else {
+                        alert("Error: " + data.message);
+                    }
+                } catch (e) {
+                    alert("Exception during factory reset: " + e);
                 }
             }
         }
