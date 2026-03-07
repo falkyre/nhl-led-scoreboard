@@ -32,6 +32,15 @@ import signal
 import argparse
 from flask import Flask, render_template, request, jsonify, send_from_directory, abort
 
+# Import the logo scraper logic
+try:
+    from src.nhl_logo_api import get_nhl_logos
+except ImportError:
+    try:
+        from nhl_logo_api import get_nhl_logos
+    except ImportError:
+        def get_nhl_logos(abbrev): return {}
+
 # --- ARGUMENT PARSING & CONFIGURATION ---
 parser = argparse.ArgumentParser(description='NHL LED Scoreboard Logo Editor')
 parser.add_argument('--venv', 
@@ -86,10 +95,14 @@ else:
 
 
 try:
-    import cairosvg
     from PIL import Image
+except ImportError as e:
+    print(f"Warning: Pillow not found ({e}). Image processing will fail.")
+
+try:
+    import cairosvg
 except (ImportError, OSError) as e:
-    print(f"Warning: Image libraries not found or system dependency missing ({e}). Logo generation will not work.")
+    print(f"Warning: cairosvg or system dependency missing ({e}). SVG generation will not work.")
     cairosvg = None
 
 app = Flask(__name__, template_folder='templates')
@@ -136,6 +149,28 @@ def index():
             pass
             
     return render_template('editor.html', 
+                           teams=TEAMS, 
+                           emulator_port=emulator_port, 
+                           emulator_pixel_size=emulator_pixel_size)
+
+@app.route('/team_summary')
+def team_summary_index():
+    emulator_port = 8888
+    emulator_pixel_size = 10 
+    
+    if os.path.exists(EMULATOR_CONFIG_PATH):
+        try:
+            with open(EMULATOR_CONFIG_PATH, 'r') as f:
+                data = json.load(f)
+                emulator_port = data.get('browser', {}).get('port', 8888)
+                if 'pixel_size' in data:
+                    emulator_pixel_size = int(data['pixel_size'])
+                elif 'display' in data and 'pixel_size' in data['display']:
+                    emulator_pixel_size = int(data['display']['pixel_size'])
+        except:
+            pass
+            
+    return render_template('team_summary_editor.html', 
                            teams=TEAMS, 
                            emulator_port=emulator_port, 
                            emulator_pixel_size=emulator_pixel_size)
@@ -227,6 +262,25 @@ def get_schedule():
 def health_check():
     return jsonify({"status": "ok"})
 
+
+@app.route('/api/historical_logos', methods=['GET'])
+def get_historical_logos():
+    team = request.args.get('team')
+    if not team:
+        return jsonify({"error": "Missing team parameter"}), 400
+        
+    try:
+        # Clean team code if it has |alt suffix
+        clean_team = team.split('|')[0] if '|' in team else team
+        
+        logos = get_nhl_logos(clean_team)
+        if not logos or clean_team not in logos:
+            return jsonify({"error": "No historical logos found for this team."}), 404
+            
+        return jsonify({"logos": logos[clean_team]})
+    except Exception as e:
+        print(f"[Backend] Error fetching historical logos: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/emulator/check_ready', methods=['GET'])
 def emulator_check_ready():
@@ -386,6 +440,18 @@ def list_files():
         files = []
     return jsonify(files)
 
+@app.route('/api/logos_config')
+def get_logos_config():
+    logos_json_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+    if not os.path.exists(logos_json_path):
+        return jsonify({})
+    try:
+        with open(logos_json_path, 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/config/<filename>', methods=['GET', 'POST'])
 def handle_config(filename):
     file_path = os.path.join(CONFIG_DIR, filename)
@@ -540,6 +606,56 @@ def handle_colors():
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/factory_reset_logos', methods=['POST'])
+def factory_reset_logos():
+    try:
+        # Run git restore for the core logos files
+        print("[Factory Reset] Running git restore on config/logos.json and config/layout/logos_*.json...")
+        subprocess.run(
+            ["git", "restore", "config/logos.json"],
+            cwd=INSTALL_DIR,
+            check=False
+        )
+        
+        # We can't glob directly in subprocess.run without shell=True, 
+        # so let's glob it with Python and restore each or all at once.
+        import glob
+        layout_logos_files = glob.glob(os.path.join(CONFIG_DIR, "logos_*.json"))
+        
+        # Re-build git restore args for the layout files
+        if layout_logos_files:
+            restore_args = ["git", "restore"] + layout_logos_files
+            subprocess.run(
+                restore_args,
+                cwd=INSTALL_DIR,
+                check=False
+            )
+            
+        # Clean up backup files (*.bak) in config/ and config/layout/
+        print("[Factory Reset] Cleaning up backup files...")
+        
+        # 1. Clean config/logos.json.*.bak
+        config_dir = os.path.join(INSTALL_DIR, 'config')
+        for f in os.listdir(config_dir):
+            if f.startswith("logos.json.") and f.endswith(".bak"):
+                try:
+                    os.remove(os.path.join(config_dir, f))
+                except Exception as e:
+                    print(f"Warning: Failed to delete {f}: {e}")
+                    
+        # 2. Clean config/layout/logos_*.json.*.bak
+        for f in os.listdir(CONFIG_DIR):
+            if f.startswith("logos_") and ".json." in f and f.endswith(".bak"):
+                try:
+                    os.remove(os.path.join(CONFIG_DIR, f))
+                except Exception as e:
+                    print(f"Warning: Failed to delete {f}: {e}")
+                    
+        return jsonify({"status": "success", "message": "Logos configuration reset to defaults."})
+    except Exception as e:
+        print(f"[Factory Reset] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/upload_alt', methods=['POST'])
 def upload_alt_logo():
     team = request.form.get('team')
@@ -582,6 +698,33 @@ def upload_alt_logo():
             
         saved_files = []
         
+        # -- SVG Check and Local Save (Outside loop) --
+        is_svg = False
+        if b'<svg' in img_bytes[:2048].lower():
+            is_svg = True
+
+        if not is_svg:
+            return jsonify({"status": "error", "message": "SVG files only."}), 400
+
+        # Place the uploaded SVG into the assets/logos/_local with the file name {TEAM}_alt.svg
+        local_directory = os.path.join(ASSETS_DIR, 'logos', '_local')
+        os.makedirs(local_directory, exist_ok=True)
+        local_svg_path = os.path.join(local_directory, f"{team}_alt.svg")
+        with open(local_svg_path, 'wb') as f:
+            f.write(img_bytes)
+
+        # Convert SVG to PNG for the scoreboard processing (once)
+        if cairosvg:
+            print("[Upload] Detected SVG, converting to PNG...")
+            try:
+                png_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
+            except Exception as e:
+                print(f"[Upload] SVG conversion failed: {e}")
+                return jsonify({"status": "error", "message": f"SVG conversion failed. The system may be missing 'cairo' dependencies (e.g. brew install cairo on mac). {str(e)}"}), 400
+        else:
+            print("[Upload] Warning: SVG uploaded but cairosvg not available.")
+            return jsonify({"status": "error", "message": "SVG conversion failed: 'cairosvg' python module is not available."}), 400
+
         for tgt in targets:
             tw, th = tgt['w'], tgt['h']
             filename = f"{tw}x{th}.png"
@@ -607,27 +750,8 @@ def upload_alt_logo():
                 except:
                     pass
 
-            # Check if it's an SVG and convert if possible
-            is_svg = False
-            # Simple check for SVG header/content
-            if img_bytes.strip().startswith(b'<svg') or (b'<?xml' in img_bytes[:100] and b'<svg' in img_bytes[:300]):
-                is_svg = True
-            
-            # Additional check: If URL ends in .svg or file content type (touched via filename earlier but we have bytes now)
-            
-            if is_svg:
-                if cairosvg:
-                    print("[Upload] Detected SVG, converting to PNG...")
-                    try:
-                        img_bytes = cairosvg.svg2png(bytestring=img_bytes, output_height=512)
-                    except Exception as e:
-                        print(f"[Upload] SVG conversion failed: {e}")
-                        # Let it fall through to PIL to fail if it really is bad
-                else:
-                    print("[Upload] Warning: SVG uploaded but cairosvg not available.")
-
             # Resize and Save
-            with Image.open(io.BytesIO(img_bytes)) as img:
+            with Image.open(io.BytesIO(png_bytes)) as img:
                 # Convert to RGBA
                 img = img.convert("RGBA")
                 
@@ -687,10 +811,80 @@ def upload_alt_logo():
             except Exception as e:
                 print(f"Warning: Failed to update config file for ALT logo: {e}")
 
+        # Ensure the global logos.json flags this team as having an 'alt' logo
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        if os.path.exists(logos_file_path):
+            try:
+                with open(logos_file_path, 'r') as f:
+                    logos_data = json.load(f)
+                
+                # If they didn't have an alt flag before, add it now
+                if team in logos_data or team not in logos_data:
+                    logos_data[team] = "alt"
+
+                # Ensure _default isn't wiped out
+                if '_default' not in logos_data:
+                    logos_data['_default'] = 'light'
+
+                with open(logos_file_path, 'w') as f:
+                    json.dump(logos_data, f, indent=2)
+            except Exception as e:
+                print(f"Warning: Failed to update logos.json for ALT logo: {e}")
+
         return jsonify({"status": "success", "files": saved_files})
 
     except Exception as e:
         print(f"Upload error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/discard_alt', methods=['POST'])
+def discard_alt_logo():
+    team = request.json.get('team')
+    if not team:
+        return jsonify({"status": "error", "message": "Missing team"}), 400
+
+    if '|' in team:
+        team = team.split('|')[0]
+
+    try:
+        # 1. Remove from global logos.json
+        logos_file_path = os.path.join(INSTALL_DIR, 'config', 'logos.json')
+        if os.path.exists(logos_file_path):
+            with open(logos_file_path, 'r') as f:
+                logos_data = json.load(f)
+            
+            if team in logos_data and logos_data[team] == "alt":
+                del logos_data[team]
+                with open(logos_file_path, 'w') as f:
+                    json.dump(logos_data, f, indent=2)
+
+        # 2. Remove 'alt' keys from layout configurations
+        for size in ["64x32", "128x64"]:
+            config_path = os.path.join(CONFIG_DIR, f"logos_{size}.json")
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config_data = json.load(f)
+                
+                if 'scoreboard' in config_data and 'logos' in config_data['scoreboard']:
+                    logos = config_data['scoreboard']['logos']
+                    if team in logos and 'alt' in logos[team]:
+                        del logos[team]['alt']
+                        with open(config_path, 'w') as f:
+                            json.dump(config_data, f, indent=2)
+
+        # 3. Best effort delete the physical alt images 
+        alt_dir = os.path.join(ASSETS_DIR, 'logos', team, 'alt')
+        if os.path.exists(alt_dir):
+            shutil.rmtree(alt_dir)
+            
+        # 4. Also delete the uploaded SVG in _local
+        local_svg_path = os.path.join(ASSETS_DIR, 'logos', '_local', f"{team}_alt.svg")
+        if os.path.exists(local_svg_path):
+            os.remove(local_svg_path)
+
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"Discard error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/logo_selection', methods=['POST'])
@@ -722,7 +916,11 @@ def save_logo_selection():
             logos_data['_default'] = 'light'
 
         # Update selection
-        logos_data[team] = logo_type
+        if logo_type == 'alt':
+            logos_data[team] = logo_type
+        else:
+            if team in logos_data:
+                del logos_data[team]
 
         # Write back
         with open(logos_file_path, 'w') as f:

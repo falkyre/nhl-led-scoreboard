@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NHL Scoreboard Logo Editor</title>
+    <title>NHL Team Summary Logo Editor</title>
     <style>
         @font-face {
             font-family: 'PixelFont';
-            src: url('/assets/fonts/04B_24__.TTF') format('truetype');
+            src: url('/assets/fonts/04B_03__.TTF') format('truetype');
         }
 
         @font-face {
@@ -149,22 +149,30 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
+            width: 35%;
             height: 100%;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             justify-content: flex-start;
             pointer-events: none;
             z-index: 20;
             text-shadow: 1px 1px 0px #000;
+            padding: 0;
+            /* Approximate one pixel letter width scaled by EDITOR_SCALE (10px) */
+            margin-left: 10px;
+            margin-top: 0;
+            margin-bottom: 0;
+            margin-right: 0;
+            box-sizing: border-box;
         }
 
         .info-line {
             color: #ffffff;
             line-height: 1;
-            text-align: center;
+            text-align: left;
             white-space: nowrap;
+            font-family: 'PixelFont';
         }
 
         .anchor-marker {
@@ -533,19 +541,8 @@
                     style="width:100%; font-size:0.8em; padding:4px;">Save Colors</button>
             </div>
         </div>
-        <div class="row">
-            <div>
-                <label>Main Stance</label>
-                <select id="stanceSelect" onchange="updateUI()">
-                    <option value="away">Away (Left)</option>
-                    <option value="home" selected>Home (Right)</option>
-                </select>
-            </div>
-        </div>
-        <div style="margin-top:15px;">
-            <label style="color:#aaa">Opponent (Visual Only)</label>
-            <select id="team2Select" onchange="updateUI()"></select>
-        </div>
+
+
         <div class="checkbox-row" style="margin-top: 15px;">
             <input type="checkbox" id="showGradient" checked onchange="toggleGradient()">
             <label for="showGradient" style="margin:0; font-weight:normal;">Show Gradient Layer</label>
@@ -600,15 +597,16 @@
 
     <div class="workspace">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-            <h3>Scoreboard Editor <span id="resDisplay" style="font-weight:normal; font-size:0.8em; color:#888;"></span>
+            <h3>Team Summary Editor <span id="resDisplay"
+                    style="font-weight:normal; font-size:0.8em; color:#888;"></span>
             </h3>
             <div class="editor-toggle-container">
-                <span style="color:#fff;">Scoreboard</span>
-                <label class="switch" title="Switch to Team Summary Editor">
-                    <input type="checkbox" onchange="switchEditor(this, '/team_summary')">
+                <span style="color:#888;">Scoreboard</span>
+                <label class="switch" title="Switch to Scoreboard Editor">
+                    <input type="checkbox" onchange="switchEditor(this, '/')" checked>
                     <span class="slider"></span>
                 </label>
-                <span style="color:#888;">Team Summary</span>
+                <span style="color:#fff;">Team Summary</span>
                 <button class="secondary" onclick="factoryResetLogos()"
                     style="margin-left:15px; background:var(--panel-bg); color:#cc3300; border:1px solid #cc3300; font-size:0.8em; padding:4px 8px;"
                     title="Reset logos.json and logos_{W}x{H}.json to defaults and clean backups">Reset to
@@ -621,9 +619,16 @@
                 style="position:absolute; left:50%; top:0; bottom:0; border-left:1px dashed #444; pointer-events:none;">
             </div>
             <div id="gameInfoOverlay" class="game-info-overlay">
-                <div class="info-line" style="font-family: 'PixelFont'; margin-top: 0;">3rd</div>
-                <div class="info-line" style="font-family: 'PixelFont';">12:34</div>
-                <div class="info-line" style="font-family: 'ScoreFont'; margin-top: 0;">3-2</div>
+                <div class="info-line" style="color: #aaa;">RECORD:</div>
+                <div class="info-line">GP:82 P:120</div>
+                <div class="info-line" style="margin-bottom: 2px;">50-20-12</div>
+                <div class="info-line" style="color: #aaa;">LAST GAME:</div>
+                <div class="info-line">@ NYR</div>
+                <div class="info-line" style="color: #0f0; margin-bottom: 2px;">W 3-2</div>
+                <div class="info-line" style="color: #aaa;">NEXT GAME:</div>
+                <div class="info-line">OCT 12</div>
+                <div class="info-line">07:00</div>
+                <div class="info-line">VS BOS</div>
             </div>
             <img id="gradientImg" class="gradient-layer" src="" alt="Gradient" draggable="false">
             <div id="anchorMarker" class="anchor-marker"></div>
@@ -1144,10 +1149,6 @@
                         }
                         window.restoreTeam = null;
                     } else {
-                        if (window.restoreStance) {
-                            document.getElementById('stanceSelect').value = window.restoreStance;
-                            window.restoreStance = null;
-                        }
                         loadColors();
                         updateUI();
                     }
@@ -1317,7 +1318,7 @@
         }
 
         function updateActualCoordinates() {
-            const stance = document.getElementById('stanceSelect').value;
+            const stance = 'home'; // placeholder for team_summary which doesn't use stance
             const anchor = getAnchorPoint(stance);
             const offsetX = parseInt(document.getElementById('posX').value) || 0;
             const offsetY = parseInt(document.getElementById('posY').value) || 0;
@@ -1495,24 +1496,9 @@
                     .then(r => r.json())
                     .then(data => {
                         if (data.opponent) {
-                            // Update Opponent for Visuals
-                            const sel2 = document.getElementById('team2Select');
-                            let found = false;
-                            for (let i = 0; i < sel2.options.length; i++) {
-                                if (sel2.options[i].value === data.opponent) {
-                                    sel2.selectedIndex = i;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) console.log("Opponent not found in list: " + data.opponent);
+                            // Opponent loading not needed for team summary
 
-                            // Auto-Switch Stance
-                            if (data.is_away) {
-                                document.getElementById('stanceSelect').value = 'away';
-                            } else {
-                                document.getElementById('stanceSelect').value = 'home';
-                            }
+                            // Auto-Switch Stance not needed for team summary
 
                             updateUI();
                         }
@@ -1526,7 +1512,7 @@
             const state = {
                 size: document.getElementById('sizeSelect').value,
                 team: document.getElementById('teamSelect').value,
-                stance: document.getElementById('stanceSelect').value,
+                // stance: document.getElementById('stanceSelect').value,
 
                 // Simulator stuff
                 emuMode: document.getElementById('emuMode').value,
@@ -1807,21 +1793,17 @@
 
         function updateOverlayTextSizes() {
             const sizeStr = document.getElementById('sizeSelect').value;
-            let topLinesSize = 8;
-            let scoreLineSize = 16;
+            let topLinesSize = 3;
             if (sizeStr === '128x64') {
-                topLinesSize = 16;
-                scoreLineSize = 32;
+                topLinesSize = 6;
             }
             const cssTopSize = topLinesSize * EDITOR_SCALE;
-            const cssScoreSize = scoreLineSize * EDITOR_SCALE;
+
             const lines = document.querySelectorAll('#gameInfoOverlay .info-line');
-            lines[0].style.fontSize = cssTopSize + 'px';
-            lines[0].style.height = cssTopSize + 'px';
-            lines[1].style.fontSize = cssTopSize + 'px';
-            lines[1].style.height = cssTopSize + 'px';
-            lines[2].style.fontSize = cssScoreSize + 'px';
-            lines[2].style.height = cssScoreSize + 'px';
+            lines.forEach(line => {
+                line.style.fontSize = cssTopSize + 'px';
+                line.style.lineHeight = cssTopSize + 'px';
+            });
         }
 
 
@@ -1830,7 +1812,7 @@
             const sel1 = document.getElementById('teamSelect');
             const sel2 = document.getElementById('team2Select');
             const cur1 = sel1.value;
-            const cur2 = sel2.value;
+            const cur2 = sel2 ? sel2.value : null;
             const options = [];
 
             STANDARD_TEAMS.forEach(t => options.push({ label: t, value: t }));
@@ -1843,8 +1825,8 @@
             });
 
             // Add any custom teams not in standard listing
-            if (currentConfig.scoreboard && currentConfig.scoreboard.logos) {
-                const logos = currentConfig.scoreboard.logos;
+            if (currentConfig.team_summary && currentConfig.team_summary.logos) {
+                const logos = currentConfig.team_summary.logos;
                 Object.keys(logos).forEach(k => {
                     if (k.startsWith('_')) return;
                     if (!STANDARD_TEAMS.includes(k) && !k.includes('|')) {
@@ -1857,24 +1839,26 @@
 
             options.sort((a, b) => a.label.localeCompare(b.label));
             sel1.innerHTML = '';
-            sel2.innerHTML = '<option value="">(None)</option>';
+            if (sel2) sel2.innerHTML = '<option value="">(None)</option>';
             options.forEach(opt => {
                 const el1 = document.createElement('option');
                 el1.value = opt.value;
                 el1.innerText = opt.label;
                 sel1.appendChild(el1);
-                const el2 = document.createElement('option');
-                el2.value = opt.value;
-                el2.innerText = opt.label;
-                sel2.appendChild(el2);
+                if (sel2) {
+                    const el2 = document.createElement('option');
+                    el2.value = opt.value;
+                    el2.innerText = opt.label;
+                    sel2.appendChild(el2);
+                }
             });
             if (cur1) sel1.value = cur1;
-            if (cur2) sel2.value = cur2;
+            if (sel2 && cur2) sel2.value = cur2;
             if (sel1.selectedIndex === -1 && options.length > 0) sel1.selectedIndex = 0;
         }
 
         function getTeamConfig(team, stance) {
-            if (!currentConfig.scoreboard || !currentConfig.scoreboard.logos) return {};
+            if (!currentConfig.team_summary || !currentConfig.team_summary.logos) return {};
             let mainKey = team;
             let subKey = null;
             if (team.includes('|')) {
@@ -1882,17 +1866,17 @@
                 mainKey = parts[0];
                 subKey = parts[1];
             }
-            const logos = currentConfig.scoreboard.logos;
+            const logos = currentConfig.team_summary.logos;
             if (subKey) {
                 if (logos[mainKey] && logos[mainKey][subKey]) {
                     const altObj = logos[mainKey][subKey];
-                    if (altObj[stance]) return altObj[stance];
+                    if (altObj.zoom || altObj.position) return altObj;
                     return altObj;
                 }
                 return null;
             }
             if (logos[mainKey]) {
-                if (logos[mainKey][stance]) return logos[mainKey][stance];
+                if (logos[mainKey].zoom || logos[mainKey].position) return logos[mainKey];
                 if (logos[mainKey].position) return logos[mainKey];
             }
             return null;
@@ -1908,8 +1892,7 @@
             }
 
             const team1Val = document.getElementById('teamSelect').value;
-            const stance1 = document.getElementById('stanceSelect').value;
-            const team2Val = document.getElementById('team2Select').value;
+            const stance1 = 'home';
             const sizeStr = document.getElementById('sizeSelect').value;
 
             // Update Tooltips
@@ -1928,7 +1911,9 @@
                     team = parts[0];
                     type = parts[1];
                 }
-                return `/assets/logos/${team}/${type}/${sizeStr}.png?t=${new Date().getTime()}`;
+                const finalSrc = `/assets/logos/${team}/${type}/${sizeStr}.png?t=${new Date().getTime()}`;
+                console.log("Setting logo src to:", finalSrc);
+                return finalSrc;
             };
 
             const img1 = document.getElementById('logoImg');
@@ -1946,23 +1931,7 @@
             document.getElementById('rotate').value = conf1.rotate || 0;
             img1.dataset.flip = conf1.flip || 0;
 
-            const img2 = document.getElementById('logoImg2');
-            if (team2Val) {
-                img2.style.display = 'block';
-                img2.src = '';
-                img2.src = getImageSrc(team2Val);
 
-                // Forces opponent to use opposite stance
-                const stance2 = (stance1 === 'home') ? 'away' : 'home';
-
-                let rawOppConf = getTeamConfig(team2Val, stance2);
-                if (!rawOppConf) rawOppConf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
-                opponentConfig = { ...rawOppConf };
-                opponentConfig.stance = stance2;
-            } else {
-                img2.style.display = 'none';
-                opponentConfig = null;
-            }
             renderVisuals();
         }
 
@@ -1970,14 +1939,14 @@
             // Default to 50% +/- 15px logic which matches layout.json and layout_64x32.json
             const center = matrixW / 2;
             const offset = 15;
-            let x = (stance === 'away') ? (center - offset) : (center + offset);
+            let x = center + offset;
             let y = 0;
             // CORRECTED DEFAULTS: Away (Left side) -> Aligned Right (growing Left from center)
-            let align = (stance === 'away') ? 'right' : 'left';
+            let align = "left";
 
             if (layoutConfig && layoutConfig.scoreboard) {
-                const key = (stance === 'home') ? 'home_logo' : 'away_logo';
-                const logoConf = layoutConfig.scoreboard[key];
+                // no keys for team_summary
+                const logoConf = layoutConfig.team_summary ? layoutConfig.team_summary.logo : null;
                 if (logoConf) {
                     if (logoConf.position) {
                         const posDef = logoConf.position;
@@ -1993,7 +1962,7 @@
         }
 
         function renderVisuals() {
-            const stance1 = document.getElementById('stanceSelect').value;
+            const stance1 = 'home';
             const img1 = document.getElementById('logoImg');
             const marker = document.getElementById('anchorMarker');
 
@@ -2016,20 +1985,7 @@
 
             applyTransform(img1, finalX, finalY, zoom, rot, flip, anchor1.align);
 
-            if (opponentConfig) {
-                const img2 = document.getElementById('logoImg2');
-                const anchor2 = getAnchorPoint(opponentConfig.stance);
 
-                let z2 = opponentConfig.zoom || "100%";
-                if (typeof z2 === 'string') z2 = parseInt(z2.replace('%', ''));
-                z2 = z2 / 100;
-
-                const pos2 = opponentConfig.position || [0, 0];
-                const finalX2 = (anchor2.x * EDITOR_SCALE) + (pos2[0] * EDITOR_SCALE);
-                const finalY2 = (anchor2.y * EDITOR_SCALE) + (pos2[1] * EDITOR_SCALE);
-
-                applyTransform(img2, finalX2, finalY2, z2, opponentConfig.rotate || 0, opponentConfig.flip || 0, anchor2.align);
-            }
 
             updateActualCoordinates();
         }
@@ -2071,7 +2027,7 @@
         function resetDefaults() {
             markUnsaved();
             const team = document.getElementById('teamSelect').value;
-            const stance = document.getElementById('stanceSelect').value;
+            const stance = 'home'; // placeholder for team_summary which doesn't use stance
             let conf = getTeamConfig(team, stance);
             if (!conf) conf = { position: [0, 0], zoom: "100%", rotate: 0, flip: 0 };
             let z = conf.zoom || "100%";
@@ -2087,7 +2043,7 @@
 
         function saveConfig() {
             const teamVal = document.getElementById('teamSelect').value;
-            const stance = document.getElementById('stanceSelect').value;
+            const stance = 'home'; // placeholder for team_summary which doesn't use stance
             const filename = currentFileName;
             const status = document.getElementById('statusMsg');
             if (!filename) {
@@ -2104,8 +2060,8 @@
                 flip: parseInt(document.getElementById('logoImg').dataset.flip),
                 crop: [0, 0, 0, 0]
             };
-            if (!currentConfig.scoreboard) currentConfig.scoreboard = {};
-            if (!currentConfig.scoreboard.logos) currentConfig.scoreboard.logos = {};
+            if (!currentConfig.team_summary) currentConfig.team_summary = {};
+            if (!currentConfig.team_summary.logos) currentConfig.team_summary.logos = {};
             let mainKey = teamVal;
             let subKey = null;
             if (teamVal.includes('|')) {
@@ -2114,12 +2070,12 @@
                 subKey = parts[1];
             }
             if (subKey) {
-                if (!currentConfig.scoreboard.logos[mainKey]) currentConfig.scoreboard.logos[mainKey] = {};
-                if (!currentConfig.scoreboard.logos[mainKey][subKey]) currentConfig.scoreboard.logos[mainKey][subKey] = {};
-                currentConfig.scoreboard.logos[mainKey][subKey][stance] = newObj;
+                if (!currentConfig.team_summary.logos[mainKey]) currentConfig.team_summary.logos[mainKey] = {};
+                if (!currentConfig.team_summary.logos[mainKey][subKey]) currentConfig.team_summary.logos[mainKey][subKey] = {};
+                currentConfig.team_summary.logos[mainKey][subKey] = newObj;
             } else {
-                if (!currentConfig.scoreboard.logos[mainKey]) currentConfig.scoreboard.logos[mainKey] = {};
-                currentConfig.scoreboard.logos[mainKey][stance] = newObj;
+                if (!currentConfig.team_summary.logos[mainKey]) currentConfig.team_summary.logos[mainKey] = {};
+                currentConfig.team_summary.logos[mainKey] = newObj;
             }
             fetch('/api/config/' + filename, {
                 method: 'POST',
