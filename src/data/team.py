@@ -26,8 +26,9 @@ class TeamScore(Team):
 
 class SeriesTeam(Team):
     def __init__(self, matchupTeam, abbrev):
-        super().__init__(matchupTeam["id"], abbrev, matchupTeam["name"]["default"])
-        self.isTop = matchupTeam["seed"]
-        self.rank = matchupTeam["seed"]
-        self.series_wins = matchupTeam["seriesWins"]
-        self.series_losses = matchupTeam["record"].split("-")[1]
+        super().__init__(matchupTeam['id'], abbrev, matchupTeam['name']['default'])
+        self.isTop = matchupTeam.get('seed', 0) == 1
+        self.rank = matchupTeam.get('seed', 0)
+        self.series_wins = matchupTeam.get('seriesWins', 0)
+        record = matchupTeam.get('record', '0-0')
+        self.series_losses = int(record.split('-')[1])

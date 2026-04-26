@@ -581,81 +581,76 @@ class Data:
 
     #
     # Playoffs
+    """
+        Currently the series ticker request all the games of a series everytime its asked to load on screen.
+        This create a lot of delay between showing each series.
+        TODO:
+            Add a refresh function to the Series object instead and trigger a refresh
+            only at specific time in the renderer.(End of a game, new day)
+    """
     def refresh_playoff(self):
-        """
-            Currently the series ticker request all the games of a series everytime its asked to load on screen.
-            This create a lot of delay between showing each series.
-            TODO:
-                Add a refresh function to the Series object instead and trigger a refresh
-                only at specific time in the renderer.(End of a game, new day)
-        """
         self.current_round = None
         self.current_round_name = None
-        self.stanleycup_round = None
+        self.stanleycup_round = False
+        self.series = []
+
         attempts_remaining = 5
         while attempts_remaining > 0:
             try:
-                # Get the plaoffs data from the nhl api
-                self.playoffs = nhl_info.Playoff(nhl_info.playoff_info(self.status.season_id))
-                # Check if there is any rounds avaialable and grab the most recent one available.
-                if self.playoffs.rounds:
-                    self.current_round = self.playoffs.rounds[str(self.playoffs.default_round)]
-                    self.current_round_name = self.current_round["roundLabel"]
-                    if self.current_round_name == "Stanley Cup Qualifier":
-                        self.current_round_name = "Qualifier"
-                    if self.playoffs.default_round == 4:
-                        self.stanleycup_round = True
+                from nhl_api.nhl_client import client
+                year = str(self.status.season_id)[:4]
+                int(year)  # validate
+                bracket = client._request(f"https://api-web.nhle.com/v1/playoff-bracket/{int(year)+1}")
 
-                    debug.debug("defaultround number is : {}".format(self.playoffs.default_round))
-                    #8478996
+                all_series = bracket.get("series", [])
+
+                # Filter to only series that have teams assigned (active rounds)
+                active_series = [s for s in all_series if "topSeedTeam" in s and "bottomSeedTeam" in s]
+
+                if not active_series:
+                    debug.info("No active playoff series found")
+                    self.isPlayoff = False
+                    break
+
+                # Find the highest active round
+                max_round = max(s["playoffRound"] for s in active_series)
+                self.current_round = {"roundNumber": max_round}
+                self.current_round_name = active_series[-1].get("seriesTitle", "Playoffs")
+                self.stanleycup_round = max_round >= 4
+
+                # Build Series objects from all active series
+                for s in active_series:
                     try:
-                        self.series = []
+                        series_obj = Series(s, self)
+                        if hasattr(series_obj, 'top_team'):
+                            self.series.append(series_obj)
+                    except Exception as e:
+                        debug.error(f"Failed to build Series for {s.get('seriesLetter')}: {e}")
 
-                        # Grab the series of the current round of playoff.
-                        self.series_list = self.current_round["series"]
+                if not self.series:
+                    self.isPlayoff = False
+                    break
 
-                        self.series_list = []
-                        for i in self.playoffs.rounds:
-                            for j in self.playoffs.rounds[i]["series"]:
-                                self.series_list.append(j)
+                # Hide lower-round series if teams have advanced
+                highest_round = max(s.round_number for s in self.series)
+                advanced_teams = set()
+                for s in self.series:
+                    if s.round_number == highest_round:
+                        advanced_teams.add(s.top_team.abbrev)
+                        advanced_teams.add(s.bottom_team.abbrev)
+                for s in self.series:
+                    if s.round_number < highest_round:
+                        if s.top_team.abbrev in advanced_teams or s.bottom_team.abbrev in advanced_teams:
+                            s.show = False
 
-                        # Check if prefered team are part of the current round of playoff
-                        self.pref_series = self.series_list
+                self.isPlayoff = True
+                self.network_issues = False
 
-                        # If the user as set to show his favorite teams in the seriesticker
-                        if self.config.seriesticker_preferred_teams_only and self.pref_series:
-                            self.series_list = self.pref_series
-                        for s in self.series_list:
-                            self.series.append(Series(s,self))
-
-                        highest_round = self.series[-1].round_number
-                        teams = []
-                        for s in self.series[::-1]:
-                            if s.round_number == highest_round:
-                                teams.append(s.top_team.abbrev)
-                                teams.append(s.bottom_team.abbrev)
-
-                            if int(s.round_number) < int(highest_round):
-                                team1 = s.top_team.abbrev
-                                team2 = s.bottom_team.abbrev
-
-                                if((team1 in teams) or (team2 in teams)):
-                                    s.show = False
-
-
-                        self.isPlayoff = True
-                    except AttributeError:
-                        debug.error(
-                            "The {} Season playoff has not started or is unavailable".format(self.playoffs.season)
-                        )
-
-                        self.isPlayoff = False
-                        break
                 break
 
             except ValueError as error_message:
                 self.network_issues = True
-                debug.error("Failed to refresh the list of Series. {} attempt remaining.".format(attempts_remaining))
+                debug.error(f"Failed to refresh playoff data. {attempts_remaining} attempts remaining.")
                 debug.error(error_message)
                 attempts_remaining -= 1
                 sleep(NETWORK_RETRY_SLEEP_TIME)
