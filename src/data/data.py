@@ -606,7 +606,8 @@ class Data:
 
                 # Filter to only series that have teams assigned (active rounds)
                 active_series = [s for s in all_series if "topSeedTeam" in s and "bottomSeedTeam" in s]
-
+                self.pref_series = active_series
+                
                 if not active_series:
                     debug.info("No active playoff series found")
                     self.isPlayoff = False
@@ -617,6 +618,17 @@ class Data:
                 self.current_round = {"roundNumber": max_round}
                 self.current_round_name = active_series[-1].get("seriesTitle", "Playoffs")
                 self.stanleycup_round = max_round >= 4
+
+                # Build Series objects from all active series
+                # Filter to preferred teams if configured
+                if self.config.seriesticker_preferred_teams_only and self.pref_series:
+                    pref_abbrevs = {t.get("abbrev") for t in self.pref_series if "abbrev" in t}
+                    active_series = [
+                        s for s in active_series
+                        if s.get("topSeedTeam", {}).get("abbrev") in pref_abbrevs
+                        or s.get("bottomSeedTeam", {}).get("abbrev") in pref_abbrevs
+                    ]
+
 
                 # Build Series objects from all active series
                 for s in active_series:
