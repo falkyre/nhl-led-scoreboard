@@ -9,6 +9,7 @@ from PIL import Image
 from data.data import Data
 
 # from data.playoffs import Series
+from nhl_api.client import NHLAPIError
 from data.scoreboard import Scoreboard
 from nhl_api.data import get_game
 from renderer.matrix import Matrix, MatrixPixels
@@ -86,7 +87,7 @@ class Seriesticker:
         if self.data.config.seriesticker_hide_completed_rounds:
             playoff_series = [
                 s for s in self.data.series
-                if getattr(s, "round_number", 0) >= self.data.current_round["roundNumber"]
+                if getattr(s, 'round_number', 0) >= self.data.current_round.get('roundNumber', 1)
             ]
 
         self.num_series = len(playoff_series)
@@ -308,6 +309,16 @@ class Seriesticker:
                     )
                     debug.error(error_message)
                     break
+                except NHLAPIError as error_message:
+                    # 404 means this game was never played (e.g. an if-necessary game
+                    # in a series that ended early). Stop processing — subsequent games
+                    # in the series will also be unplayed.
+                    debug.warning(
+                        "Game {} not found (unplayed if-necessary game). "
+                        "Skipping remaining games in series.".format(game["id"])
+                    )
+                    debug.error(error_message)
+                    return
             # If one of the request for player info failed after 5 attempts, return an empty dictionary
             if attempts_remaining == 0:
                 return False

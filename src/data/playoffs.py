@@ -32,13 +32,15 @@ class Series:
     def __init__(self, series, data):
 
         """
+            This no longer uses the nhl record api for series information as it has been moved to a different endpoint and the record api is no longer updating with playoff information.
             Get all games of a series through this.
             https://records.nhl.com/site/api/playoff-series?cayenneExp=playoffSeriesLetter="A" and seasonId=20182019
 
             This is off from the nhl record api. Not sure if it will update as soon as the day is over.
         """
         try:
-            series_info = client.get_series_record(series["seriesLetter"], data.status.season_id)
+            #series_info = client.get_series_record(series["seriesLetter"], data.status.season_id)
+            series_info = client._request(f"https://api-web.nhle.com/v1/schedule/playoff-series/{data.status.season_id}/{series['seriesLetter'].lower()}"); series_info["topSeed"], series_info["bottomSeed"], series_info["total"] = series_info["topSeedTeam"], series_info["bottomSeedTeam"], len(series_info.get("games", []))
             if series_info["total"] == 0:
                 debug.info("No series, playoffs not running?")
                 raise Exception("No series information")
@@ -56,8 +58,8 @@ class Series:
         except Exception:
             self.conference = ""
         self.series_letter = series["seriesLetter"]
-        self.round_number = series["roundNumber"]
-        self.round_name = series["seriesLabel"]
+        self.round_number = series["playoffRound"]
+        self.round_name = series["seriesTitle"]
         self.top_team = SeriesTeam(top, top_team_abbrev)
         self.bottom_team = SeriesTeam(bottom, bottom_team_abbrev)
         self.games = series_info["games"]
