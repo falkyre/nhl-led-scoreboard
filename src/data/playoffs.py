@@ -58,8 +58,8 @@ class Series:
         except Exception:
             self.conference = ""
         self.series_letter = series["seriesLetter"]
-        self.round_number = series["roundNumber"]
-        self.round_name = series["seriesLabel"]
+        self.round_number = series["playoffRound"]
+        self.round_name = series["seriesTitle"]
         self.top_team = SeriesTeam(top, top_team_abbrev)
         self.bottom_team = SeriesTeam(bottom, bottom_team_abbrev)
         self.games = series_info["games"]

@@ -3,6 +3,10 @@
 
 ![scoreboard demo](assets/images/scoreboard.jpg)
 
+
+> [!IMPORTANT]
+> V2026.3.0 will be the last release of the scoreboard based on the orginal code base.  I am moving to focus on the next generation of the scoreboard.
+
 # Releases
 
 Click on button to go to release notes.
@@ -13,7 +17,7 @@ Click on button to go to release notes.
 
 # NHL LED Scoreboard Raspberry Pi Image 
 
-[![Build Scoreboard Image](https://github.com/falkyre/nhl-led-scoreboard-img/actions/workflows/pi-gen.yml/badge.svg)](https://github.com/falkyre/nhl-led-scoreboard-img/actions/workflows/pi-gen.yml)
+[![Create Release - Dietpi Image](https://github.com/falkyre/nhl-led-scoreboard-img/actions/workflows/dietpi-release.yml/badge.svg)](https://github.com/falkyre/nhl-led-scoreboard-img/actions/workflows/dietpi-release.yml)
 [![GitHub release (latest by date)](https://badgers.space/github/release/falkyre/nhl-led-scoreboard-img?label=Version)](https://github.com/falkyre/nhl-led-scoreboard-img/releases/latest)
 
 [![discord button](assets/images/discord_button.png)](https://discord.gg/CWa5CzK)
